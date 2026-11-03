@@ -51,7 +51,7 @@ This static demo is separate from the Java server. To enable bookings later, dep
 
 ## Website controls
 
-- Choose a movie from the poster shelf and pick a showtime.
+- Choose a movie from the poster shelf to update its poster and title on the curved auditorium screen, then pick a showtime.
 - Choose IMAX, Orchestra / Mezzanine / Balcony, or Standard from the auditorium selector.
 - Drag to orbit, right-drag to pan, scroll to zoom, and click individual 3D seats to select them.
 - Use “Seat map references” to inspect the supplied layout images.

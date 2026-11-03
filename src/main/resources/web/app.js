@@ -5,7 +5,7 @@ const movies = [
     { id: "dark-knight", title: "The Dark Knight", genre: "Action · Crime", rating: "9.0", poster: "/assets/posters/dark-knight.png" },
     { id: "resident-evil", title: "Resident Evil", genre: "Action · Horror", rating: "7.4", poster: "/assets/posters/resident-evil.png" },
     { id: "jailer2", title: "Jailer 2", genre: "Action · Drama", rating: "8.1", poster: "/assets/posters/jailer2.png" },
-    { id: "bhadra", title: "Bhadra", genre: "Action · Romance", rating: "7.2", poster: "/assets/posters/bhadra.png" }
+    { id: "baththa", title: "Baththa", genre: "Action · Romance", rating: "7.2", poster: "/assets/posters/baththa.png" }
 ];
 
 const priceTable = {
@@ -80,6 +80,7 @@ function renderMovieShelf() {
         card.append(poster, copy);
         card.addEventListener("click", () => {
             activeMovie = movie;
+            renderer?.setMovie(movie);
             renderMovieShelf();
             showToast(`${movie.title} selected`);
         });
@@ -465,6 +466,7 @@ try {
                 : "Drag to look around · Click a seat to select";
         }
     });
+    renderer.setMovie(activeMovie);
     changeLayout(activeLayout);
     document.querySelector("#zoomIn").addEventListener("click", () => renderer.zoom(-3));
     document.querySelector("#zoomOut").addEventListener("click", () => renderer.zoom(3));

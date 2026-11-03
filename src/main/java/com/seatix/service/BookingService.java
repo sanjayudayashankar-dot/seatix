@@ -493,5 +493,5 @@ public final class BookingService {
     }
 
     private static final Set<String> SUPPORTED_MOVIES = Set.of(
-            "Interstellar", "The Dark Knight", "Resident Evil", "Jailer 2", "Bhadra");
+            "Interstellar", "The Dark Knight", "Resident Evil", "Jailer 2", "Baththa");
 }

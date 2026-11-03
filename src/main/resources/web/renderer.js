@@ -16,10 +16,20 @@ class SeatixRenderer {
         this.positionLocation = this.gl.getAttribLocation(this.program, "aPosition");
         this.normalLocation = this.gl.getAttribLocation(this.program, "aNormal");
         this.colorLocation = this.gl.getAttribLocation(this.program, "aColor");
+        this.textureCoordinateLocation = this.gl.getAttribLocation(this.program, "aTextureCoordinate");
+        this.screenLocation = this.gl.getAttribLocation(this.program, "aScreen");
         this.matrixLocation = this.gl.getUniformLocation(this.program, "uViewProjection");
+        this.movieTextureLocation = this.gl.getUniformLocation(this.program, "uMovieTexture");
         this.positionBuffer = this.gl.createBuffer();
         this.normalBuffer = this.gl.createBuffer();
         this.colorBuffer = this.gl.createBuffer();
+        this.textureCoordinateBuffer = this.gl.createBuffer();
+        this.screenBuffer = this.gl.createBuffer();
+        this.movieTexture = this.gl.createTexture();
+        this.movie = null;
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.movieTexture);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, 1, 1, 0, this.gl.RGBA,
+            this.gl.UNSIGNED_BYTE, new Uint8Array([16, 19, 26, 255]));
         this.vertexCount = 0;
         this.viewportWidth = 0;
         this.viewportHeight = 0;
@@ -36,20 +46,33 @@ class SeatixRenderer {
             attribute vec3 aPosition;
             attribute vec3 aNormal;
             attribute vec3 aColor;
+            attribute vec2 aTextureCoordinate;
+            attribute float aScreen;
             uniform mat4 uViewProjection;
             varying vec3 vNormal;
             varying vec3 vColor;
+            varying vec2 vTextureCoordinate;
+            varying float vScreen;
             void main() {
                 gl_Position = uViewProjection * vec4(aPosition, 1.0);
                 vNormal = aNormal;
                 vColor = aColor;
+                vTextureCoordinate = aTextureCoordinate;
+                vScreen = aScreen;
             }
         `);
         const fragmentShader = this.compileShader(gl.FRAGMENT_SHADER, `
             precision mediump float;
             varying vec3 vNormal;
             varying vec3 vColor;
+            varying vec2 vTextureCoordinate;
+            varying float vScreen;
+            uniform sampler2D uMovieTexture;
             void main() {
+                if (vScreen > 0.5) {
+                    gl_FragColor = texture2D(uMovieTexture, vTextureCoordinate);
+                    return;
+                }
                 vec3 lightDirection = normalize(vec3(-0.45, 0.86, 0.55));
                 float diffuse = max(dot(normalize(vNormal), lightDirection), 0.0);
                 float lighting = 0.52 + diffuse * 0.48;
@@ -79,6 +102,79 @@ class SeatixRenderer {
         return shader;
     }
 
+    setMovie(movie) {
+        this.movie = movie;
+        const image = new Image();
+        image.onload = () => {
+            if (this.movie === movie) this.drawMovieScreen(movie, image);
+        };
+        image.onerror = () => {
+            if (this.movie === movie) {
+                console.error(`Could not load the ${movie.title} poster for the auditorium screen.`);
+                this.drawMovieScreen(movie, null);
+            }
+        };
+        image.src = movie.poster;
+    }
+
+    drawMovieScreen(movie, image) {
+        const screen = document.createElement("canvas");
+        screen.width = 2048;
+        screen.height = 200;
+        const context = screen.getContext("2d");
+        context.fillStyle = "#10131a";
+        context.fillRect(0, 0, screen.width, screen.height);
+
+        if (image) {
+            const sourceRatio = image.naturalWidth / image.naturalHeight;
+            const targetRatio = screen.width / screen.height;
+            const sourceWidth = sourceRatio > targetRatio ? image.naturalHeight * targetRatio : image.naturalWidth;
+            const sourceHeight = sourceRatio > targetRatio ? image.naturalHeight : image.naturalWidth / targetRatio;
+            const sourceX = (image.naturalWidth - sourceWidth) / 2;
+            const sourceY = (image.naturalHeight - sourceHeight) / 2;
+            context.filter = "blur(18px)";
+            context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, screen.width, screen.height);
+            context.filter = "none";
+        }
+
+        const shade = context.createLinearGradient(0, 0, screen.width, 0);
+        shade.addColorStop(0, "rgba(5, 7, 11, 0.88)");
+        shade.addColorStop(0.68, "rgba(5, 7, 11, 0.58)");
+        shade.addColorStop(1, "rgba(5, 7, 11, 0.36)");
+        context.fillStyle = shade;
+        context.fillRect(0, 0, screen.width, screen.height);
+        if (image) {
+            const posterHeight = 176;
+            const posterWidth = posterHeight * image.naturalWidth / image.naturalHeight;
+            const posterX = screen.width - posterWidth - 48;
+            context.drawImage(image, posterX, 12, posterWidth, posterHeight);
+        }
+        context.fillStyle = "#c9f25a";
+        context.font = "700 24px Segoe UI, Arial, sans-serif";
+        context.fillText("SEATIX  ·  NOW SHOWING", 72, 48);
+        context.fillStyle = "#ffffff";
+        let titleSize = 66;
+        context.font = `700 ${titleSize}px Segoe UI, Arial, sans-serif`;
+        while (context.measureText(movie.title).width > 1250 && titleSize > 34) {
+            titleSize -= 2;
+            context.font = `700 ${titleSize}px Segoe UI, Arial, sans-serif`;
+        }
+        context.fillText(movie.title, 72, 126);
+        context.fillStyle = "rgba(255, 255, 255, 0.78)";
+        context.font = "500 20px Segoe UI, Arial, sans-serif";
+        context.fillText("EXPERIENCE THE MOVIE IN 3D", 76, 166);
+
+        const gl = this.gl;
+        gl.bindTexture(gl.TEXTURE_2D, this.movieTexture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, screen);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        this.draw();
+    }
+
     setSeats(seats) {
         this.seats = seats;
         this.selectedIds.clear();
@@ -96,17 +192,19 @@ class SeatixRenderer {
         const positions = [];
         const normals = [];
         const colors = [];
-        this.addBox(positions, normals, colors, 0, -0.29, 1.2, 35, 0.58, 31, [0.105, 0.13, 0.17]);
-        this.addBox(positions, normals, colors, 0, 0.12, -12.1, 25, 0.38, 4.1, [0.18, 0.20, 0.25]);
-        this.addCurvedScreen(positions, normals, colors);
+        const textureCoordinates = [];
+        const screenVertices = [];
+        this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, -0.29, 1.2, 35, 0.58, 31, [0.105, 0.13, 0.17]);
+        this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 0.12, -12.1, 25, 0.38, 4.1, [0.18, 0.20, 0.25]);
+        this.addCurvedScreen(positions, normals, colors, textureCoordinates, screenVertices);
 
         if (this.seats.some((seat) => seat.section === "Mezzanine")) {
-            this.addBox(positions, normals, colors, 0, 2.03, -0.9, 28, 0.32, 7.7, [0.15, 0.17, 0.22]);
-            this.addBox(positions, normals, colors, 0, 2.25, 3.05, 28, 0.11, 0.18, [0.42, 0.46, 0.53]);
+            this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 2.03, -0.9, 28, 0.32, 7.7, [0.15, 0.17, 0.22]);
+            this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 2.25, 3.05, 28, 0.11, 0.18, [0.42, 0.46, 0.53]);
         }
         if (this.seats.some((seat) => seat.section === "Balcony")) {
-            this.addBox(positions, normals, colors, 0, 3.58, 1.2, 28, 0.32, 6.7, [0.17, 0.18, 0.23]);
-            this.addBox(positions, normals, colors, 0, 3.80, 4.65, 28, 0.11, 0.18, [0.42, 0.46, 0.53]);
+            this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 3.58, 1.2, 28, 0.32, 6.7, [0.17, 0.18, 0.23]);
+            this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 3.80, 4.65, 28, 0.11, 0.18, [0.42, 0.46, 0.53]);
         }
 
         for (const seat of this.seats) {
@@ -116,28 +214,30 @@ class SeatixRenderer {
                         : [0.13, 0.76, 0.85];
             const back = base.map((value) => value * 0.79);
             const frame = [0.29, 0.33, 0.40];
-            this.addBox(positions, normals, colors, seat.x, seat.y + 0.47, seat.z, 0.54, 0.15, 0.54, base);
-            this.addBox(positions, normals, colors, seat.x, seat.y + 0.86, seat.z + 0.20, 0.54, 0.66, 0.14, back);
-            this.addBox(positions, normals, colors, seat.x - 0.32, seat.y + 0.58, seat.z, 0.09, 0.20, 0.57, frame);
-            this.addBox(positions, normals, colors, seat.x + 0.32, seat.y + 0.58, seat.z, 0.09, 0.20, 0.57, frame);
-            this.addBox(positions, normals, colors, seat.x, seat.y + 0.22, seat.z + 0.04, 0.15, 0.33, 0.15, frame);
+            this.addBox(positions, normals, colors, textureCoordinates, screenVertices, seat.x, seat.y + 0.47, seat.z, 0.54, 0.15, 0.54, base);
+            this.addBox(positions, normals, colors, textureCoordinates, screenVertices, seat.x, seat.y + 0.86, seat.z + 0.20, 0.54, 0.66, 0.14, back);
+            this.addBox(positions, normals, colors, textureCoordinates, screenVertices, seat.x - 0.32, seat.y + 0.58, seat.z, 0.09, 0.20, 0.57, frame);
+            this.addBox(positions, normals, colors, textureCoordinates, screenVertices, seat.x + 0.32, seat.y + 0.58, seat.z, 0.09, 0.20, 0.57, frame);
+            this.addBox(positions, normals, colors, textureCoordinates, screenVertices, seat.x, seat.y + 0.22, seat.z + 0.04, 0.15, 0.33, 0.15, frame);
         }
 
         this.vertexCount = positions.length / 3;
         this.uploadBuffer(this.positionBuffer, positions, this.positionLocation);
         this.uploadBuffer(this.normalBuffer, normals, this.normalLocation);
         this.uploadBuffer(this.colorBuffer, colors, this.colorLocation);
+        this.uploadBuffer(this.textureCoordinateBuffer, textureCoordinates, this.textureCoordinateLocation, 2);
+        this.uploadBuffer(this.screenBuffer, screenVertices, this.screenLocation, 1);
     }
 
-    uploadBuffer(buffer, data, location) {
+    uploadBuffer(buffer, data, location, components = 3) {
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
         gl.enableVertexAttribArray(location);
-        gl.vertexAttribPointer(location, 3, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribPointer(location, components, gl.FLOAT, false, 0, 0);
     }
 
-    addCurvedScreen(positions, normals, colors) {
+    addCurvedScreen(positions, normals, colors, textureCoordinates, screenVertices) {
         const segments = 36;
         const radius = 30;
         const halfAngle = 0.42;
@@ -150,12 +250,16 @@ class SeatixRenderer {
             const topLeft = point(leftAngle, 6.2);
             const bottomRight = point(rightAngle, 3.75);
             const topRight = point(rightAngle, 6.2);
-            this.addTriangle(positions, normals, colors, bottomLeft, bottomRight, topLeft, screenColor);
-            this.addTriangle(positions, normals, colors, bottomRight, topRight, topLeft, screenColor);
+            const left = index / segments;
+            const right = (index + 1) / segments;
+            this.addTriangle(positions, normals, colors, textureCoordinates, screenVertices,
+                bottomLeft, bottomRight, topLeft, screenColor, [[left, 0], [right, 0], [left, 1]]);
+            this.addTriangle(positions, normals, colors, textureCoordinates, screenVertices,
+                bottomRight, topRight, topLeft, screenColor, [[right, 0], [right, 1], [left, 1]]);
         }
     }
 
-    addBox(positions, normals, colors, x, y, z, width, height, depth, color) {
+    addBox(positions, normals, colors, textureCoordinates, screenVertices, x, y, z, width, height, depth, color) {
         const x0 = x - width / 2;
         const x1 = x + width / 2;
         const y0 = y - height / 2;
@@ -171,12 +275,13 @@ class SeatixRenderer {
             [[x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0]]
         ];
         for (const [first, second, third, fourth] of faces) {
-            this.addTriangle(positions, normals, colors, first, second, third, color);
-            this.addTriangle(positions, normals, colors, first, third, fourth, color);
+            this.addTriangle(positions, normals, colors, textureCoordinates, screenVertices, first, second, third, color);
+            this.addTriangle(positions, normals, colors, textureCoordinates, screenVertices, first, third, fourth, color);
         }
     }
 
-    addTriangle(positions, normals, colors, first, second, third, color) {
+    addTriangle(positions, normals, colors, textureCoordinates, screenVertices,
+                first, second, third, color, textureUV = null) {
         const edgeA = [second[0] - first[0], second[1] - first[1], second[2] - first[2]];
         const edgeB = [third[0] - first[0], third[1] - first[1], third[2] - first[2]];
         const normal = normalize([
@@ -184,10 +289,14 @@ class SeatixRenderer {
             edgeA[2] * edgeB[0] - edgeA[0] * edgeB[2],
             edgeA[0] * edgeB[1] - edgeA[1] * edgeB[0]
         ]);
-        for (const vertex of [first, second, third]) {
+        const vertices = [first, second, third];
+        for (let index = 0; index < vertices.length; index++) {
+            const vertex = vertices[index];
             positions.push(vertex[0], vertex[1], vertex[2]);
             normals.push(normal[0], normal[1], normal[2]);
             colors.push(color[0], color[1], color[2]);
+            textureCoordinates.push(...(textureUV ? textureUV[index] : [0, 0]));
+            screenVertices.push(textureUV ? 1 : 0);
         }
     }
 
@@ -332,6 +441,13 @@ class SeatixRenderer {
         gl.vertexAttribPointer(this.normalLocation, 3, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
         gl.vertexAttribPointer(this.colorLocation, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordinateBuffer);
+        gl.vertexAttribPointer(this.textureCoordinateLocation, 2, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.screenBuffer);
+        gl.vertexAttribPointer(this.screenLocation, 1, gl.FLOAT, false, 0, 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this.movieTexture);
+        gl.uniform1i(this.movieTextureLocation, 0);
         gl.drawArrays(gl.TRIANGLES, 0, this.vertexCount);
     }
 }
