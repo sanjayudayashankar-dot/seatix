@@ -23,6 +23,7 @@ let currentSeats = [];
 let renderer;
 let toastTimeout;
 let pendingBooking = null;
+let bookingEnabled = false;
 
 const movieShelf = document.querySelector("#movieShelf");
 const seatList = document.querySelector("#selectedList");
@@ -33,6 +34,7 @@ const feeLabel = document.querySelector("#convenienceFee");
 const totalLabel = document.querySelector("#totalPrice");
 const clearButton = document.querySelector("#clearSelection");
 const continueButton = document.querySelector("#continueButton");
+const bookingAvailability = document.querySelector("#bookingAvailability");
 const layoutPicker = document.querySelector("#layoutPicker");
 const toast = document.querySelector("#toast");
 const seatTooltip = document.querySelector("#seatTooltip");
@@ -188,7 +190,7 @@ function updateSelection() {
     feeLabel.textContent = currency(fee);
     totalLabel.textContent = currency(tickets + fee);
     clearButton.disabled = selected.length === 0;
-    continueButton.disabled = selected.length === 0;
+    continueButton.disabled = selected.length === 0 || !bookingEnabled;
     seatList.replaceChildren();
 
     if (selected.length === 0) {
@@ -340,18 +342,24 @@ function connectServiceStatus() {
         })
         .then((data) => {
             if (data.status !== "ok") {
-                status.textContent = "Seatix service unavailable";
+                status.textContent = "View-only demo · booking disabled";
+                bookingAvailability.textContent = "Bookings are disabled in this public demo.";
                 return;
             }
-            status.textContent = data.database === "connected"
+            bookingEnabled = data.database === "connected";
+            status.textContent = bookingEnabled
                 ? "MySQL connected · simulated payments"
-                : data.database === "not_configured"
-                    ? "MySQL not configured · checkout unavailable"
-                    : "MySQL unavailable · checkout disabled";
+                : "View-only demo · booking disabled";
+            bookingAvailability.textContent = bookingEnabled
+                ? "Booking checkout is available; payments are simulated."
+                : "Bookings are disabled in this public demo.";
+            updateSelection();
         })
-        .catch((error) => {
-            status.textContent = "Seatix service unavailable";
-            console.error("Could not reach the Seatix server.", error);
+        .catch(() => {
+            bookingEnabled = false;
+            status.textContent = "View-only demo · booking disabled";
+            bookingAvailability.textContent = "Bookings are disabled in this public demo.";
+            updateSelection();
         });
 }
 
@@ -380,6 +388,7 @@ clearButton.addEventListener("click", () => {
     updateSelection();
 });
 continueButton.addEventListener("click", () => {
+    if (!bookingEnabled) return;
     const seats = currentSeats.filter((seat) => selectedSeatIds.has(seat.id));
     if (seats.length === 0) return;
     contactFormError.hidden = true;

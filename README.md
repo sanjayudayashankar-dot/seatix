@@ -38,23 +38,16 @@ Run `database/schema.sql` on the hosted database before deploying. Keep database
 
 This project is currently a **demo**, not a production ticketing service: payment is simulated, seat availability is not loaded from a live theatre inventory, and customer contact details are stored without account verification or a self-service deletion flow. Visitors are warned to use test contact details only. Do not collect real customer data or sell real tickets until those production requirements are implemented.
 
-### Example setup: Railway
+### Free static demo: Vercel
 
-Railway can build the root `Dockerfile`, run the Java service, and provide a separate MySQL service. Review its current pricing and usage limits before deploying.
+The root `vercel.json` publishes only `src/main/resources/web`, which contains the interactive auditorium, supplied posters, and reference layouts. No JavaScript build tooling or package manager is required. This is a **view-only** deployment: Vercel does not run the Java/MySQL backend, and the website disables booking and contact-data collection when the backend health endpoint is unavailable.
 
-1. Put this project in a private GitHub repository, then create a Railway project from that repository.
-2. Add a MySQL service to the same Railway project. Run `database/schema.sql` against that database before accepting bookings.
-3. In the Seatix service's Variables, set:
+1. Import the private GitHub repository `sanjayudayashankar-dot/seatix` in the Vercel dashboard.
+2. Keep the project root at the repository root. Vercel reads `vercel.json`; no build command or environment variables are needed.
+3. Deploy, then use the HTTPS URL Vercel gives the project.
+4. Open the public site, confirm it says **View-only demo · booking disabled**, and share the URL.
 
-   ```text
-   SEATIX_DB_URL=jdbc:mysql://${{MySQL.MYSQLHOST}}:${{MySQL.MYSQLPORT}}/${{MySQL.MYSQLDATABASE}}?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true
-   SEATIX_DB_USER=${{MySQL.MYSQLUSER}}
-   SEATIX_DB_PASSWORD=${{MySQL.MYSQLPASSWORD}}
-   ```
-
-   If your database service has a different name, replace `MySQL` in those references. Keep the database private; don't create a public database endpoint just for the website.
-4. Configure the Seatix service health check to `GET /api/health`. Generate a public domain in the service's **Settings → Networking → Public Networking**.
-5. Open that HTTPS domain and confirm the footer reports **MySQL connected** before sharing it.
+This static demo is separate from the Java server. To enable bookings later, deploy the Java backend and configure a protected MySQL-compatible database; do not expose customer contact details in a public demo.
 
 ## Website controls
 

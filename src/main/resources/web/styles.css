@@ -171,6 +171,7 @@ h1 span { color: var(--accent); }
 .continue-button:not(:disabled):hover { filter: brightness(1.09); transform: translateY(-1px); }
 .continue-button:disabled { opacity: .43; cursor: not-allowed; }
 .continue-button span { font-size: 16px; }
+.booking-availability { margin: 8px 0 0; color: #d7bd7d; font-size: 9px; line-height: 1.45; }
 .secure-note { margin: 10px 0 0; display: flex; justify-content: center; gap: 5px; color: #777a82; font-size: 8px; }
 .secure-note span { color: var(--accent); }
 
