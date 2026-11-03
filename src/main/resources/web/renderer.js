@@ -7,7 +7,7 @@ class SeatixRenderer {
         this.gl = canvas.getContext("webgl", { antialias: true, alpha: false });
         if (!this.gl) throw new Error("WebGL is not available in this browser.");
 
-        this.camera = { yaw: 0.12, pitch: 0.39, distance: 39, target: [0, 1.9, 0] };
+        this.camera = { yaw: 0.12, pitch: 0.39, distance: 39, target: [0, 4.8, 0] };
         this.seats = [];
         this.selectedIds = new Set();
         this.drag = null;
@@ -120,7 +120,7 @@ class SeatixRenderer {
     drawMovieScreen(movie, image) {
         const screen = document.createElement("canvas");
         screen.width = 2048;
-        screen.height = 200;
+        screen.height = 1152;
         const context = screen.getContext("2d");
         context.fillStyle = "#10131a";
         context.fillRect(0, 0, screen.width, screen.height);
@@ -144,25 +144,25 @@ class SeatixRenderer {
         context.fillStyle = shade;
         context.fillRect(0, 0, screen.width, screen.height);
         if (image) {
-            const posterHeight = 176;
+            const posterHeight = 1000;
             const posterWidth = posterHeight * image.naturalWidth / image.naturalHeight;
             const posterX = screen.width - posterWidth - 48;
-            context.drawImage(image, posterX, 12, posterWidth, posterHeight);
+            context.drawImage(image, posterX, 76, posterWidth, posterHeight);
         }
         context.fillStyle = "#c9f25a";
-        context.font = "700 24px Segoe UI, Arial, sans-serif";
-        context.fillText("SEATIX  ·  NOW SHOWING", 72, 48);
+        context.font = "700 42px Segoe UI, Arial, sans-serif";
+        context.fillText("SEATIX  ·  NOW SHOWING", 96, 156);
         context.fillStyle = "#ffffff";
-        let titleSize = 66;
+        let titleSize = 132;
         context.font = `700 ${titleSize}px Segoe UI, Arial, sans-serif`;
-        while (context.measureText(movie.title).width > 1250 && titleSize > 34) {
+        while (context.measureText(movie.title).width > 1200 && titleSize > 52) {
             titleSize -= 2;
             context.font = `700 ${titleSize}px Segoe UI, Arial, sans-serif`;
         }
-        context.fillText(movie.title, 72, 126);
+        context.fillText(movie.title, 96, 540);
         context.fillStyle = "rgba(255, 255, 255, 0.78)";
-        context.font = "500 20px Segoe UI, Arial, sans-serif";
-        context.fillText("EXPERIENCE THE MOVIE IN 3D", 76, 166);
+        context.font = "500 34px Segoe UI, Arial, sans-serif";
+        context.fillText("EXPERIENCE THE MOVIE IN 3D", 100, 620);
 
         const gl = this.gl;
         gl.bindTexture(gl.TEXTURE_2D, this.movieTexture);
@@ -241,15 +241,18 @@ class SeatixRenderer {
         const segments = 36;
         const radius = 30;
         const halfAngle = 0.42;
+        const screenHeight = radius * 2 * halfAngle * 9 / 16;
+        const screenBottom = 1.6;
+        const screenTop = screenBottom + screenHeight;
         const screenColor = [0.83, 0.89, 0.97];
         for (let index = 0; index < segments; index++) {
             const leftAngle = -halfAngle + 2 * halfAngle * index / segments;
             const rightAngle = -halfAngle + 2 * halfAngle * (index + 1) / segments;
             const point = (angle, y) => [radius * Math.sin(angle), y, -14.1 + radius * (1 - Math.cos(angle))];
-            const bottomLeft = point(leftAngle, 3.75);
-            const topLeft = point(leftAngle, 6.2);
-            const bottomRight = point(rightAngle, 3.75);
-            const topRight = point(rightAngle, 6.2);
+            const bottomLeft = point(leftAngle, screenBottom);
+            const topLeft = point(leftAngle, screenTop);
+            const bottomRight = point(rightAngle, screenBottom);
+            const topRight = point(rightAngle, screenTop);
             const left = index / segments;
             const right = (index + 1) / segments;
             this.addTriangle(positions, normals, colors, textureCoordinates, screenVertices,
