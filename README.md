@@ -40,7 +40,7 @@ This project is currently a **demo**, not a production ticketing service: paymen
 
 ### Free static demo: Vercel
 
-The root `vercel.json` publishes only `src/main/resources/web`, which contains the interactive auditorium, supplied posters, and reference layouts. No JavaScript build tooling or package manager is required. This is a **view-only** deployment: Vercel does not run the Java/MySQL backend, and the website disables booking and contact-data collection when the backend health endpoint is unavailable.
+The root `vercel.json` publishes only `src/main/resources/web`, which contains the interactive auditorium, supplied posters, and reference layouts. No JavaScript build tooling or package manager is required. This is a **view-only** deployment: Vercel does not run the Java/MySQL backend, and `/api/health` is rewritten to a static response that keeps booking and contact-data collection disabled.
 
 1. Import the private GitHub repository `sanjayudayashankar-dot/seatix` in the Vercel dashboard.
 2. Keep the project root at the repository root. Vercel reads `vercel.json`; no build command or environment variables are needed.

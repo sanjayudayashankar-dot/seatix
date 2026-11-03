@@ -3,5 +3,11 @@
   "framework": null,
   "buildCommand": null,
   "installCommand": null,
-  "outputDirectory": "src/main/resources/web"
+  "outputDirectory": "src/main/resources/web",
+  "rewrites": [
+    {
+      "source": "/api/health",
+      "destination": "/health.json"
+    }
+  ]
 }
