@@ -195,6 +195,8 @@ h1 span { color: var(--accent); }
 .payment-dialog .dialog-header { margin-bottom: 15px; }
 .payment-dialog .dialog-header h2 { font-size: 19px; }
 .contact-intro { margin: 0 0 17px; color: #a4a5ad; font-size: 11px; line-height: 1.55; }
+.contact-demo-warning { margin: 0 0 15px; padding: 10px 11px; border: 1px solid rgba(241, 192, 88, .22); border-radius: 6px; background: rgba(241, 192, 88, .07); color: #d3c7a6; font-size: 9px; line-height: 1.55; }
+.contact-demo-warning strong { color: #f1c058; }
 .contact-fields { display: grid; gap: 7px; }
 .contact-fields label { margin-top: 5px; color: #e2e1e4; font-size: 10px; font-weight: 650; }
 .contact-fields input { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid #373941; border-radius: 6px; background: #191b21; color: var(--text); font-size: 12px; }

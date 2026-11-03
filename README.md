@@ -36,7 +36,7 @@ The project includes a `Dockerfile` for container-based Java hosting. The contai
 
 Run `database/schema.sql` on the hosted database before deploying. Keep database credentials in the provider's secret settings, never in source control or the Docker image. Configure the provider's health check to `GET /api/health`.
 
-This project is currently a **demo**, not a production ticketing service: payment is simulated, seat availability is not loaded from a live theatre inventory, and customer contact details are stored without account verification or a self-service deletion flow. Do not collect real customer data or sell real tickets until those production requirements are implemented.
+This project is currently a **demo**, not a production ticketing service: payment is simulated, seat availability is not loaded from a live theatre inventory, and customer contact details are stored without account verification or a self-service deletion flow. Visitors are warned to use test contact details only. Do not collect real customer data or sell real tickets until those production requirements are implemented.
 
 ### Example setup: Railway
 
