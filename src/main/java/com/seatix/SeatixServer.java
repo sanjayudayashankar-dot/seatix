@@ -77,13 +77,13 @@ public final class SeatixServer {
             handleScreenInteriors(exchange);
             return;
         }
-        if ("POST".equals(method) && "/api/bookings".equals(path)) {
-            handleCreateBooking(exchange);
-            return;
-        }
         if ("POST".equals(method)) {
             if (!isSameOriginRequest(exchange)) {
                 respondJson(exchange, 403, jsonError("Cross-origin booking requests are not allowed."));
+                return;
+            }
+            if ("/api/bookings".equals(path)) {
+                handleCreateBooking(exchange);
                 return;
             }
             Matcher paymentPath = PAYMENT_PATH.matcher(path == null ? "" : path);
@@ -239,20 +239,41 @@ public final class SeatixServer {
 
         private static boolean isSameOriginRequest(HttpExchange exchange) {
             String origin = exchange.getRequestHeaders().getFirst("Origin");
+            String hostHeader = exchange.getRequestHeaders().getFirst("Host");
+            return isSameOrigin(origin, hostHeader);
+        }
+
+        static boolean isSameOrigin(String origin, String hostHeader) {
             if (origin == null || origin.isBlank()) return true;
             try {
                 java.net.URI originUri = java.net.URI.create(origin);
-                String hostHeader = exchange.getRequestHeaders().getFirst("Host");
-                if (hostHeader == null || originUri.getHost() == null) return false;
-                String requestHost = hostHeader.substring(0, hostHeader.lastIndexOf(':') >= 0
-                        ? hostHeader.lastIndexOf(':') : hostHeader.length());
-                int requestPort = hostHeader.lastIndexOf(':') >= 0
-                        ? Integer.parseInt(hostHeader.substring(hostHeader.lastIndexOf(':') + 1)) : 80;
+                if (hostHeader == null || hostHeader.isBlank()
+                        || originUri.getHost() == null
+                        || originUri.getRawPath() != null && !originUri.getRawPath().isEmpty()
+                        || originUri.getRawQuery() != null
+                        || originUri.getRawFragment() != null
+                        || originUri.getRawUserInfo() != null
+                        || !("http".equalsIgnoreCase(originUri.getScheme())
+                        || "https".equalsIgnoreCase(originUri.getScheme()))) {
+                    return false;
+                }
+
+                java.net.URI requestUri = java.net.URI.create("http://" + hostHeader);
+                if (requestUri.getHost() == null
+                        || requestUri.getRawUserInfo() != null
+                        || requestUri.getRawPath() != null && !requestUri.getRawPath().isEmpty()
+                        || requestUri.getRawQuery() != null
+                        || requestUri.getRawFragment() != null
+                        || !originUri.getHost().equalsIgnoreCase(requestUri.getHost())) {
+                    return false;
+                }
+
                 int originPort = originUri.getPort() >= 0 ? originUri.getPort()
-                        : originUri.getScheme().equalsIgnoreCase("https") ? 443 : 80;
-                return (originUri.getScheme().equalsIgnoreCase("http") || originUri.getScheme().equalsIgnoreCase("https"))
-                        && originUri.getHost().equalsIgnoreCase(requestHost)
-                        && originPort == requestPort;
+                        : "https".equalsIgnoreCase(originUri.getScheme()) ? 443 : 80;
+                int requestPort = requestUri.getPort();
+                return requestPort >= 0
+                        ? originPort == requestPort
+                        : originPort == 80 || originPort == 443;
             } catch (IllegalArgumentException exception) {
                 return false;
             }
