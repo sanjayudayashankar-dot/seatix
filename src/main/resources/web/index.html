@@ -210,6 +210,26 @@
     </div>
     <button class="retry-payment-button" id="retryPayment" type="button" hidden>Return to seats and try again</button>
 </dialog>
+<main class="booking-success-page" id="bookingSuccessPage" aria-labelledby="bookingSuccessHeading" tabindex="-1" hidden>
+    <a class="brand booking-success-brand" href="/" aria-label="Seatix home">
+        <span class="brand-mark">S</span>
+        <span>seatix<span class="brand-period">.</span></span>
+    </a>
+    <section class="booking-success-card" aria-live="polite">
+        <div class="booking-success-icon" aria-hidden="true">✓</div>
+        <p class="eyebrow muted">YOUR MOVIE NIGHT IS BOOKED</p>
+        <h1 id="bookingSuccessHeading">Booking confirmed</h1>
+        <p class="booking-success-reference">Booking reference <strong id="successBookingId">—</strong></p>
+        <div class="booking-success-details">
+            <div><span>Movie & showtime</span><strong id="successMovie">—</strong></div>
+            <div><span>Seats</span><strong id="successSeats">—</strong></div>
+            <div><span>Total</span><strong id="successTotal">—</strong></div>
+            <div><span>Payment</span><strong id="successPayment">—</strong></div>
+        </div>
+        <p class="booking-success-note"><strong>Demo payment:</strong> your booking is confirmed, but no real payment was processed and no money was charged.</p>
+        <button class="simulate-success-button booking-success-done" id="bookingSuccessDone" type="button">Back to movies</button>
+    </section>
+</main>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

@@ -61,6 +61,7 @@ This static demo is separate from the Java server. To enable bookings, use the D
 - Daily demo showtimes are scheduled across three screens without overlapping screenings on the same screen, allowing a 15-minute changeover based on estimated runtimes. Interstellar and The Dark Knight are scheduled only in IMAX; Resident Evil, Jailer 2, and Baththa are scheduled across Standard Screen 2 and Orchestra Screen 3. Select a film, screen, and available time before choosing seats. Confirm actual runtimes and showtimes before using a live schedule.
 - Use “Seat map references” to inspect the supplied layout images.
 - Continue to create a pending booking in PostgreSQL. The checkout dialog can simulate either a successful or failed payment; it never asks for card information and does not move money.
+- A successful simulated payment opens a booking confirmation screen with the booking reference, movie, seats, total, and payment status.
 - Before a booking is created, enter an Indian mobile number and email address. Mobile numbers are normalized to `+91` format and saved with that booking in `booking_contacts`.
 
 ## Booking and payment status

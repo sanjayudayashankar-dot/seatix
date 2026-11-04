@@ -95,6 +95,7 @@ const paymentStatusMessage = document.querySelector("#paymentStatusMessage");
 const paymentActions = document.querySelector("#paymentActions");
 const retryPaymentButton = document.querySelector("#retryPayment");
 const closePaymentButton = document.querySelector("#closePaymentDialog");
+const bookingSuccessPage = document.querySelector("#bookingSuccessPage");
 
 function renderMovieShelf() {
     movieShelf.replaceChildren();
@@ -497,6 +498,20 @@ function setPaymentStatus(status, title, message) {
         status === "SUCCESS" ? "✓" : status === "FAILED" ? "!" : "…";
 }
 
+function showBookingConfirmation(booking, amount) {
+    const showDate = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" })
+        .format(new Date(`${activeDate}T00:00:00`));
+    document.querySelector("#successBookingId").textContent = `#${booking.bookingId}`;
+    document.querySelector("#successMovie").textContent =
+        `${activeMovie.title} · ${screens[activeLayout].label} · ${showDate}, ${activeTime}`;
+    document.querySelector("#successSeats").textContent = booking.seats.join(", ");
+    document.querySelector("#successTotal").textContent = currency(amount);
+    document.querySelector("#successPayment").textContent = "Successful · simulated";
+    paymentDialog.close();
+    bookingSuccessPage.hidden = false;
+    bookingSuccessPage.focus();
+}
+
 async function simulatePayment(outcome) {
     if (!pendingBooking) return;
     for (const button of paymentActions.querySelectorAll("button")) button.disabled = true;
@@ -505,7 +520,6 @@ async function simulatePayment(outcome) {
         const result = await postForm(`/api/bookings/${pendingBooking.bookingId}/payment`, { outcome });
         pendingBooking.paymentStatus = result.paymentStatus;
         if (result.paymentStatus === "SUCCESS" && result.bookingStatus === "CONFIRMED") {
-            setPaymentStatus("SUCCESS", "Payment successful · booking confirmed", "Your simulated payment is recorded. No money was moved.");
             for (const seat of currentSeats) {
                 if (selectedSeatIds.has(seat.id)) seat.unavailable = true;
             }
@@ -513,6 +527,7 @@ async function simulatePayment(outcome) {
             updateSelection();
             paymentActions.hidden = true;
             retryPaymentButton.hidden = true;
+            showBookingConfirmation(pendingBooking, result.amount);
         } else if (result.paymentStatus === "FAILED") {
             const expired = result.bookingStatus === "CANCELLED" && outcome === "success";
             setPaymentStatus("FAILED", expired ? "Checkout expired · no charge made" : "Payment failed · no charge made",
@@ -659,6 +674,10 @@ document.querySelector("#closeContactDialog").addEventListener("click", () => co
 document.querySelector("#cancelContactDialog").addEventListener("click", () => contactDialog.close());
 document.querySelector("#simulatePaymentSuccess").addEventListener("click", () => simulatePayment("success"));
 document.querySelector("#simulatePaymentFailure").addEventListener("click", () => simulatePayment("failed"));
+document.querySelector("#bookingSuccessDone").addEventListener("click", () => {
+    bookingSuccessPage.hidden = true;
+    pendingBooking = null;
+});
 retryPaymentButton.addEventListener("click", () => {
     paymentDialog.close();
     pendingBooking = null;
