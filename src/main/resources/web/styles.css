@@ -123,6 +123,7 @@ h1 span { color: var(--accent); }
 .layout-picker select { max-width: min(270px, 30vw); padding: 9px 28px 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: #15171c; color: #e2e1df; font-size: 10px; letter-spacing: 0; cursor: pointer; }
 .auditorium-card { overflow: hidden; border: 1px solid rgba(255, 255, 255, .1); border-radius: 11px; background: linear-gradient(145deg, #12151b, #0d0f14 80%); }
 .canvas-toolbar { height: 39px; padding: 0 13px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, .05); }
+.canvas-toolbar-actions { display: flex; align-items: center; gap: 14px; }
 .live-label { display: flex; align-items: center; gap: 7px; color: #a7a9b0; font-size: 8px; font-weight: 750; letter-spacing: 1px; }
 .live-label .status-dot { width: 5px; height: 5px; flex-basis: 5px; }
 .quiet-button { padding: 5px 0; border: 0; background: transparent; color: #999ba4; font-size: 9px; cursor: pointer; }
@@ -131,6 +132,28 @@ h1 span { color: var(--accent); }
 .canvas-container { position: relative; height: clamp(340px, 47vh, 510px); overflow: hidden; background: radial-gradient(ellipse at 52% 56%, #1a1f2c 0, #11151e 44%, #0c0f15 100%); }
 #auditoriumCanvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; outline: none; }
 #auditoriumCanvas:active { cursor: grabbing; }
+.canvas-container.map-mode #auditoriumCanvas,
+.canvas-container.map-mode .canvas-overlay,
+.canvas-container.map-mode .camera-controls { display: none; }
+.seat-map-view { position: absolute; inset: 0; overflow: auto; padding: 17px 18px 24px; background: radial-gradient(ellipse at 50% 0, #1a1f2c 0, #10131a 60%); }
+.seat-map-view[hidden] { display: none; }
+.seat-map-screen { width: min(440px, 70%); height: 23px; margin: 0 auto 20px; display: grid; place-items: center; border: 1px solid rgba(201, 242, 90, .28); border-radius: 50% 50% 5px 5px / 100% 100% 5px 5px; background: linear-gradient(180deg, rgba(201, 242, 90, .14), transparent); color: #b6d971; font-size: 8px; font-weight: 750; letter-spacing: 3px; }
+.seat-map-section + .seat-map-section { margin-top: 21px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, .09); }
+.seat-map-section-title { margin: 0 0 10px 38px; color: #b6b8c0; font-size: 10px; font-weight: 650; letter-spacing: .8px; text-transform: uppercase; }
+.seat-map-row { min-width: max-content; min-height: 34px; display: flex; align-items: center; gap: 4px; }
+.seat-map-row + .seat-map-row { margin-top: 3px; }
+.seat-map-row-label { width: 27px; flex: 0 0 27px; color: #898c97; font-size: 9px; font-weight: 650; text-align: center; }
+.seat-map-seat { width: 27px; height: 27px; padding: 0; border: 1px solid rgba(57, 203, 224, .52); border-radius: 6px 6px 4px 4px; background: rgba(57, 203, 224, .12); color: #b9f4fa; font: inherit; font-size: 9px; cursor: pointer; transition: background .12s, border-color .12s, transform .12s; }
+.seat-map-seat.premium { border-color: rgba(244, 203, 72, .6); background: rgba(244, 203, 72, .13); color: #f7e5a5; }
+.seat-map-seat:hover:not(:disabled) { z-index: 1; transform: translateY(-2px) scale(1.08); border-color: #fff; background: rgba(57, 203, 224, .35); }
+.seat-map-seat.premium:hover:not(:disabled) { background: rgba(244, 203, 72, .35); }
+.seat-map-seat:focus-visible { z-index: 1; outline: 2px solid #fff; outline-offset: 2px; }
+.seat-map-seat.aisle-before { margin-left: 12px; }
+.seat-map-seat:disabled { border-color: rgba(227, 83, 93, .4); background: rgba(227, 83, 93, .13); color: #cc7a80; cursor: not-allowed; text-decoration: line-through; }
+.seat-map-seat.selected { border-color: #fd863e; background: #fd863e; color: #20140e; box-shadow: 0 0 0 2px rgba(253, 134, 62, .2); }
+.seat-map-seat.selected:hover { background: #ff9a5d; }
+.seat-map-seat.premium.selected { border-color: #fd863e; background: #fd863e; color: #20140e; }
+.seat-map-seat:disabled.selected { border-color: #fd863e; background: #fd863e; color: #20140e; }
 .canvas-overlay { position: absolute; z-index: 1; pointer-events: none; color: #777d8a; font-size: 8px; letter-spacing: 1.1px; }
 .canvas-overlay.top-left { top: 12px; left: 14px; }
 .canvas-overlay.top-left span { padding-left: 4px; color: var(--accent); }

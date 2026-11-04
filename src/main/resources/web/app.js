@@ -1,22 +1,65 @@
 "use strict";
 
 const movies = [
-    { id: "interstellar", title: "Interstellar", genre: "Sci-fi · Adventure", rating: "8.7", poster: "/assets/posters/interstellar.png" },
-    { id: "dark-knight", title: "The Dark Knight", genre: "Action · Crime", rating: "9.0", poster: "/assets/posters/dark-knight.png" },
-    { id: "resident-evil", title: "Resident Evil", genre: "Action · Horror", rating: "7.4", poster: "/assets/posters/resident-evil.png" },
-    { id: "jailer2", title: "Jailer 2", genre: "Action · Drama", rating: "8.1", poster: "/assets/posters/jailer2.png" },
-    { id: "baththa", title: "Baththa", genre: "Action · Romance", rating: "7.2", poster: "/assets/posters/baththa.png" }
+    { id: "interstellar", title: "Interstellar", genre: "Sci-fi · Adventure", rating: "8.7", poster: "/assets/posters/interstellar.png", durationMinutes: 169, screenings: { imax: ["10:00", "16:15"] } },
+    { id: "dark-knight", title: "The Dark Knight", genre: "Action · Crime", rating: "9.0", poster: "/assets/posters/dark-knight.png", durationMinutes: 152, screenings: { imax: ["13:15", "19:30"] } },
+    { id: "resident-evil", title: "Resident Evil", genre: "Action · Horror", rating: "7.4", poster: "/assets/posters/resident-evil.png", durationMinutes: 120, screenings: { standard2: ["10:00", "18:00"], standard3: ["13:15", "21:15"] } },
+    { id: "jailer2", title: "Jailer 2", genre: "Action · Drama", rating: "8.1", poster: "/assets/posters/jailer2.png", durationMinutes: 150, screenings: { standard2: ["12:15", "20:15"], standard3: ["15:30"] } },
+    { id: "baththa", title: "Baththa", genre: "Action · Romance", rating: "7.2", poster: "/assets/posters/baththa.png", durationMinutes: 140, screenings: { standard2: ["15:15"], standard3: ["10:30", "18:30"] } }
 ];
 
+const screens = {
+    standard2: {
+        screenCode: "STANDARD_2", label: "Screen 2 · Standard · 2.35:1", name: "Screen 2 · Standard · 2.35:1",
+        interior: { aspectRatio: 2.35, wallColor: "#19130F", ceilingColor: "#0A0908", trimColor: "#70431E", accentColor: "#EFA23A", seatColor: "#1A1715", aisleLightColor: "#FFC05B", wallSlatCount: 20, ceilingStarCount: 180, ringLightCount: 2 }
+    },
+    imax: {
+        screenCode: "IMAX", label: "Screen 1 · IMAX · 16:9", name: "Screen 1 · IMAX · 16:9",
+        interior: { aspectRatio: 16 / 9, wallColor: "#17110D", ceilingColor: "#090807", trimColor: "#6B3B16", accentColor: "#F3A63B", seatColor: "#171514", aisleLightColor: "#FFB64A", wallSlatCount: 24, ceilingStarCount: 240, ringLightCount: 2 }
+    },
+    standard3: {
+        screenCode: "STANDARD_3", label: "Screen 3 · Orchestra · 2.35:1", name: "Screen 3 · Orchestra · 2.35:1",
+        interior: { aspectRatio: 2.35, wallColor: "#18120E", ceilingColor: "#080807", trimColor: "#75451D", accentColor: "#F2A641", seatColor: "#1A1715", aisleLightColor: "#FFB34C", wallSlatCount: 22, ceilingStarCount: 200, ringLightCount: 2 }
+    }
+};
+
+function validateScreenSchedule() {
+    const scheduleByScreen = new Map();
+    for (const movie of movies) {
+        for (const [screen, times] of Object.entries(movie.screenings)) {
+            const screenings = scheduleByScreen.get(screen) ?? [];
+            for (const time of times) {
+                const [hours, minutes] = time.split(":").map(Number);
+                screenings.push({ movie: movie.title, start: hours * 60 + minutes, duration: movie.durationMinutes });
+            }
+            scheduleByScreen.set(screen, screenings);
+        }
+    }
+
+    for (const [screen, screenings] of scheduleByScreen) {
+        screenings.sort((first, second) => first.start - second.start);
+        for (let index = 1; index < screenings.length; index++) {
+            const previous = screenings[index - 1];
+            if (screenings[index].start < previous.start + previous.duration + 15) {
+                throw new Error(`The ${screen} screen schedule has overlapping screenings.`);
+            }
+        }
+    }
+}
+
+validateScreenSchedule();
+
 const priceTable = {
-    standard: { standard: 260, premium: 380 },
-    imax: { standard: 300, premium: 420 },
-    orchestra: { standard: 350, premium: 500, mezzanine: 300, mezzaninePremium: 430, balcony: 250 }
+    standard2: { standard: 260, premium: 380 },
+    standard3: {
+        Orchestra: { standard: 350, premium: 500 }
+    },
+    imax: { standard: 300, premium: 420 }
 };
 
 const selectedSeatIds = new Set();
 let activeMovie = movies[0];
-let activeTime = "19:15";
+let activeTime = "";
 let activeDate = "";
 let activeLayout = "imax";
 let currentSeats = [];
@@ -38,6 +81,9 @@ const bookingAvailability = document.querySelector("#bookingAvailability");
 const layoutPicker = document.querySelector("#layoutPicker");
 const toast = document.querySelector("#toast");
 const seatTooltip = document.querySelector("#seatTooltip");
+const seatMapView = document.querySelector("#seatMapView");
+const seatMapToggle = document.querySelector("#seatMapToggle");
+const auditoriumModeLabel = document.querySelector("#auditoriumModeLabel");
 const contactDialog = document.querySelector("#contactDialog");
 const contactForm = document.querySelector("#contactForm");
 const contactFormError = document.querySelector("#contactFormError");
@@ -79,8 +125,13 @@ function renderMovieShelf() {
         copy.append(title, genre, rating);
         card.append(poster, copy);
         card.addEventListener("click", () => {
+            if (activeMovie.id === movie.id) return;
             activeMovie = movie;
             renderer?.setMovie(movie);
+            activeLayout = Object.keys(movie.screenings)[0];
+            layoutPicker.value = activeLayout;
+            updateShowtimeOptions();
+            changeLayout(activeLayout);
             renderMovieShelf();
             showToast(`${movie.title} selected`);
         });
@@ -91,9 +142,6 @@ function renderMovieShelf() {
 function makeSeat(layout, section, row, seatNumber, x, y, z, premium, unavailable) {
     const category = premium ? "premium" : "standard";
     const prices = priceTable[layout];
-    const sectionPrice = layout === "orchestra" && section !== "Orchestra"
-        ? section === "Mezzanine" && premium ? prices.mezzaninePremium : prices[section.toLowerCase()]
-        : null;
     return {
         id: `${layout}-${section}-${row}-${seatNumber}`,
         section,
@@ -103,13 +151,13 @@ function makeSeat(layout, section, row, seatNumber, x, y, z, premium, unavailabl
         y,
         z,
         category,
-        price: sectionPrice ?? prices[category],
+        price: prices[section]?.[category] ?? prices[category],
         unavailable
     };
 }
 
 function addThreeBlocks(seats, config) {
-    const { layout, section, rows, y = 0, z = -8, spacing = 0.62, rowRise = 0.09, count = 30, premiumRows = [], accessible = false } = config;
+    const { layout, section, rows, y = 0.14, z = -8, spacing = 0.62, rowRise = 0.18, count = 30, premiumRows = [], accessible = false } = config;
     rows.forEach((row, rowIndex) => {
         const seatCount = typeof count === "function" ? count(rowIndex) : count;
         const leftSeats = Math.ceil(seatCount * 0.23);
@@ -150,20 +198,12 @@ function createLayout(layout) {
             count: (index) => index < 10 ? 28 : index < 20 ? 30 : 26,
             premiumRows: [8, 9, 10, 11, 12], accessible: true
         });
-    } else if (layout === "orchestra") {
+    } else if (layout === "standard3") {
         addThreeBlocks(seats, {
             layout, section: "Orchestra",
             rows: ["CC", "A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X"],
             z: -11, spacing: 0.61, count: (index) => index < 8 ? 30 : 34,
             premiumRows: [6, 7, 8, 9, 10]
-        });
-        addThreeBlocks(seats, {
-            layout, section: "Mezzanine", rows: ["A", "B", "C", "D", "E", "F"],
-            y: 3.3, z: -3.2, spacing: 0.64, rowRise: 0.055, count: 28, premiumRows: [0, 1, 2]
-        });
-        addThreeBlocks(seats, {
-            layout, section: "Balcony", rows: ["A", "B", "C", "D", "E", "F", "G", "H"],
-            y: 6.4, z: -1.6, spacing: 0.67, rowRise: 0.04, count: 26
         });
     } else {
         addThreeBlocks(seats, {
@@ -212,16 +252,90 @@ function updateSelection() {
     }
 
     renderer?.setSelectedSeats(selectedSeatIds);
+    for (const button of seatMapView.querySelectorAll(".seat-map-seat")) {
+        const selected = selectedSeatIds.has(button.dataset.seatId);
+        button.classList.toggle("selected", selected);
+        button.setAttribute("aria-pressed", String(selected));
+    }
+}
+
+function renderSeatMap() {
+    seatMapView.replaceChildren();
+    const screen = document.createElement("div");
+    screen.className = "seat-map-screen";
+    screen.textContent = "SCREEN";
+    seatMapView.append(screen);
+    const sections = new Map();
+    for (const seat of currentSeats) {
+        if (!sections.has(seat.section)) sections.set(seat.section, new Map());
+        const rows = sections.get(seat.section);
+        if (!rows.has(seat.row)) rows.set(seat.row, []);
+        rows.get(seat.row).push(seat);
+    }
+
+    for (const [sectionName, rows] of sections) {
+        const section = document.createElement("section");
+        section.className = "seat-map-section";
+        const heading = document.createElement("h3");
+        heading.className = "seat-map-section-title";
+        heading.textContent = sectionName;
+        section.append(heading);
+
+        for (const [rowName, seats] of rows) {
+            const row = document.createElement("div");
+            row.className = "seat-map-row";
+            row.setAttribute("role", "group");
+            row.setAttribute("aria-label", `${sectionName}, row ${rowName}`);
+            const label = document.createElement("span");
+            label.className = "seat-map-row-label";
+            label.textContent = rowName;
+            row.append(label);
+
+            seats.sort((first, second) => first.seatNumber - second.seatNumber);
+            let previousSeat = null;
+            for (const seat of seats) {
+                const button = document.createElement("button");
+                button.className = "seat-map-seat";
+                if (seat.category === "premium") button.classList.add("premium");
+                button.type = "button";
+                button.textContent = seat.seatNumber;
+                button.dataset.seatId = seat.id;
+                button.disabled = seat.unavailable;
+                button.setAttribute("aria-pressed", "false");
+                const status = seat.unavailable ? "unavailable" : `${seat.category}, ${currency(seat.price)}`;
+                button.setAttribute("aria-label", `${sectionName}, row ${rowName}, seat ${seat.seatNumber}, ${status}`);
+                button.title = `${sectionName} · Row ${rowName} · Seat ${seat.seatNumber} · ${seat.unavailable ? "Unavailable" : currency(seat.price)}`;
+                if (previousSeat && seat.x - previousSeat.x > 2) button.classList.add("aisle-before");
+                button.addEventListener("click", () => selectSeat(seat));
+                row.append(button);
+                previousSeat = seat;
+            }
+            section.append(row);
+        }
+        seatMapView.append(section);
+    }
 }
 
 function changeLayout(layout) {
     activeLayout = layout;
     selectedSeatIds.clear();
     currentSeats = createLayout(layout);
+    renderer?.setInterior(screens[layout].interior);
     renderer?.setSeats(currentSeats);
+    renderSeatMap();
     updateSelection();
     seatTooltip.textContent = `${currentSeats.length.toLocaleString("en-IN")} seats · Click available seats to select`;
 }
+
+seatMapToggle.addEventListener("click", () => {
+    const showMap = seatMapView.hidden;
+    seatMapView.hidden = !showMap;
+    seatMapView.parentElement.classList.toggle("map-mode", showMap);
+    seatMapToggle.textContent = showMap ? "Back to 3D view" : "Easy seat map";
+    seatMapToggle.setAttribute("aria-pressed", String(showMap));
+    auditoriumModeLabel.textContent = showMap ? "EASY SEAT MAP" : "LIVE 3D VIEW";
+    if (showMap) seatMapView.querySelector(".seat-map-seat:not(:disabled)")?.focus();
+});
 
 function showToast(message) {
     toast.textContent = message;
@@ -241,19 +355,111 @@ function updateShowtimeOptions() {
     const now = new Date();
     const today = localDateString(now);
     const selectedDate = document.querySelector("#showDate").value;
-    document.querySelectorAll(".time-button").forEach((button) => {
-        const isPast = selectedDate === today && button.dataset.time <= `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-        button.disabled = isPast;
-        if (button.dataset.time === activeTime && isPast) button.classList.remove("active");
-    });
-    const availableTimes = [...document.querySelectorAll(".time-button")].filter((button) => !button.disabled);
-    if (!availableTimes.some((button) => button.dataset.time === activeTime)) {
-        activeTime = availableTimes[0]?.dataset.time ?? "";
+    const compatibleScreens = Object.keys(activeMovie.screenings);
+    if (!compatibleScreens.includes(activeLayout)) activeLayout = compatibleScreens[0];
+    for (const option of layoutPicker.options) {
+        option.disabled = !compatibleScreens.includes(option.value);
     }
-    for (const button of document.querySelectorAll(".time-button")) {
-        button.classList.toggle("active", !button.disabled && button.dataset.time === activeTime);
+    layoutPicker.value = activeLayout;
+
+    const screenChip = document.querySelector("#screenName");
+    screenChip.textContent = screens[activeLayout].name;
+    const times = activeMovie.screenings[activeLayout] ?? [];
+    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    const availableTimes = times.filter((time) => selectedDate !== today || time > currentTime);
+    if (!availableTimes.includes(activeTime)) activeTime = availableTimes[0] ?? "";
+
+    const timeOptions = document.querySelector("#timeOptions");
+    timeOptions.replaceChildren();
+    for (const time of times) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "time-button";
+        button.dataset.time = time;
+        button.textContent = new Intl.DateTimeFormat("en-IN", {
+            hour: "numeric", minute: "2-digit", hour12: true
+        }).format(new Date(`2000-01-01T${time}:00`));
+        button.disabled = !availableTimes.includes(time);
+        button.classList.toggle("active", !button.disabled && time === activeTime);
+        button.addEventListener("click", () => {
+            if (time === activeTime) return;
+            activeTime = time;
+            timeOptions.querySelectorAll(".time-button").forEach((item) => {
+                item.classList.toggle("active", item.dataset.time === activeTime);
+            });
+            selectedSeatIds.clear();
+            updateSelection();
+        });
+        timeOptions.append(button);
+    }
+    if (times.length === 0) {
+        const message = document.createElement("span");
+        message.className = "no-showtimes";
+        message.textContent = "No screenings on this screen";
+        timeOptions.append(message);
+    } else if (availableTimes.length === 0) {
+        const message = document.createElement("span");
+        message.className = "no-showtimes";
+        message.textContent = "No more screenings today";
+        timeOptions.append(message);
     }
     activeDate = selectedDate;
+    const formatChip = document.querySelector(".format-chip");
+    formatChip.setAttribute("aria-label", screens[activeLayout].name);
+    formatChip.querySelector(".screen-label").textContent = screens[activeLayout].name;
+}
+
+function isScheduledShow(movieTitle, layout, time) {
+    const movie = movies.find((item) => item.title === movieTitle);
+    return Boolean(movie?.screenings[layout]?.includes(time));
+}
+
+function applyScreenInteriors(interiors) {
+    if (!Array.isArray(interiors) || interiors.length !== Object.keys(screens).length) {
+        throw new Error("The screen interior configuration must contain all three screens.");
+    }
+    const loadedCodes = new Set();
+    for (const config of interiors) {
+        const layout = Object.keys(screens).find((key) => screens[key].screenCode === config.screenCode);
+        if (!layout || loadedCodes.has(config.screenCode) || !Number.isFinite(config.aspectRatio)
+                || config.aspectRatio <= 1 || !/^#[0-9a-f]{6}$/i.test(config.wallColor)
+                || !/^#[0-9a-f]{6}$/i.test(config.ceilingColor)
+                || !/^#[0-9a-f]{6}$/i.test(config.trimColor)
+                || !/^#[0-9a-f]{6}$/i.test(config.accentColor)
+                || !/^#[0-9a-f]{6}$/i.test(config.seatColor)
+                || !/^#[0-9a-f]{6}$/i.test(config.aisleLightColor)) {
+            throw new Error(`Invalid screen interior configuration for ${config.screenCode ?? "unknown screen"}.`);
+        }
+        loadedCodes.add(config.screenCode);
+        const ratioLabel = config.aspectRatio > 2.2 ? "2.35:1" : "16:9";
+        screens[layout].name = `${config.screenName} · ${ratioLabel}`;
+        screens[layout].interior = config;
+    }
+    renderer?.setInterior(screens[activeLayout].interior);
+}
+
+async function loadScreenInteriors() {
+    let response;
+    try {
+        response = await fetch("/api/screens/interiors");
+        if (!response.ok) throw new Error(`Interior service returned ${response.status}.`);
+    } catch (apiError) {
+        console.warn("Could not load screen interiors from the Java/MySQL service; trying bundled defaults.", apiError);
+        try {
+            response = await fetch("/screen-interiors.json");
+            if (!response.ok) throw new Error(`Bundled screen interiors returned ${response.status}.`);
+        } catch (fallbackError) {
+            console.error("Could not load screen interior configuration.", fallbackError);
+            showToast("Screen interior configuration could not be loaded.");
+            return;
+        }
+    }
+    try {
+        applyScreenInteriors(await response.json());
+    } catch (error) {
+        console.error("Invalid screen interior configuration.", error);
+        showToast("Screen interior configuration is invalid.");
+    }
 }
 
 async function postForm(url, values) {
@@ -272,7 +478,8 @@ function openPaymentDialog(booking) {
     document.querySelector("#checkoutBookingId").textContent = `#${booking.bookingId}`;
     const showDate = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" })
         .format(new Date(`${activeDate}T00:00:00`));
-    document.querySelector("#checkoutMovie").textContent = `${activeMovie.title} · ${showDate}, ${activeTime}`;
+    document.querySelector("#checkoutMovie").textContent =
+        `${activeMovie.title} · ${screens[activeLayout].label} · ${showDate}, ${activeTime}`;
     document.querySelector("#checkoutSeats").textContent = booking.seats.join(", ");
     document.querySelector("#checkoutTotal").textContent = currency(booking.total);
     setPaymentStatus("PENDING", "Payment pending", "No payment has been processed.");
@@ -369,21 +576,22 @@ renderMovieShelf();
 const showDateInput = document.querySelector("#showDate");
 showDateInput.min = localDateString();
 const localTime = `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`;
-const hasShowtimeToday = [...document.querySelectorAll(".time-button")].some((button) => button.dataset.time > localTime);
+const hasShowtimeToday = movies.some((movie) =>
+    Object.values(movie.screenings).some((times) => times.some((time) => time > localTime)));
 const defaultShowDate = new Date();
 if (!hasShowtimeToday) defaultShowDate.setDate(defaultShowDate.getDate() + 1);
 showDateInput.value = localDateString(defaultShowDate);
-updateShowtimeOptions();
-showDateInput.addEventListener("change", updateShowtimeOptions);
-
-document.querySelectorAll(".time-button").forEach((button) => {
-    button.addEventListener("click", () => {
-        activeTime = button.dataset.time;
-        document.querySelectorAll(".time-button").forEach((item) => item.classList.toggle("active", item === button));
-    });
+showDateInput.addEventListener("change", () => {
+    updateShowtimeOptions();
+    selectedSeatIds.clear();
+    updateSelection();
 });
 
-layoutPicker.addEventListener("change", () => changeLayout(layoutPicker.value));
+layoutPicker.addEventListener("change", () => {
+    activeLayout = layoutPicker.value;
+    updateShowtimeOptions();
+    changeLayout(activeLayout);
+});
 clearButton.addEventListener("click", () => {
     selectedSeatIds.clear();
     updateSelection();
@@ -411,6 +619,14 @@ contactForm.addEventListener("submit", async (event) => {
     createBookingButton.disabled = true;
     createBookingButton.textContent = "Creating booking…";
     continueButton.disabled = true;
+    if (!activeTime || !isScheduledShow(activeMovie.title, activeLayout, activeTime)) {
+        contactFormError.textContent = "Choose an available screening before continuing.";
+        contactFormError.hidden = false;
+        createBookingButton.disabled = false;
+        createBookingButton.innerHTML = submitLabel;
+        updateSelection();
+        return;
+    }
     const form = {
         movie: activeMovie.title,
         layout: activeLayout,
@@ -467,7 +683,7 @@ try {
         }
     });
     renderer.setMovie(activeMovie);
-    changeLayout(activeLayout);
+    renderer.setSeats(currentSeats);
     document.querySelector("#zoomIn").addEventListener("click", () => renderer.zoom(-3));
     document.querySelector("#zoomOut").addEventListener("click", () => renderer.zoom(3));
     document.querySelector("#resetCamera").addEventListener("click", () => renderer.resetCamera());
@@ -477,4 +693,7 @@ try {
     console.error("Could not initialize the Seatix 3D auditorium.", error);
 }
 
+updateShowtimeOptions();
+changeLayout(activeLayout);
 connectServiceStatus();
+loadScreenInteriors();

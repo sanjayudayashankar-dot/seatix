@@ -7,8 +7,9 @@ class SeatixRenderer {
         this.gl = canvas.getContext("webgl", { antialias: true, alpha: false });
         if (!this.gl) throw new Error("WebGL is not available in this browser.");
 
-        this.camera = { yaw: 0.12, pitch: 0.39, distance: 39, target: [0, 4.8, 0] };
+        this.camera = { yaw: 0, pitch: 0.24, distance: 13, target: [0, 4.9, -3.5] };
         this.seats = [];
+        this.interior = null;
         this.selectedIds = new Set();
         this.drag = null;
         this.lastPointer = [0, 0];
@@ -20,16 +21,20 @@ class SeatixRenderer {
         this.screenLocation = this.gl.getAttribLocation(this.program, "aScreen");
         this.matrixLocation = this.gl.getUniformLocation(this.program, "uViewProjection");
         this.movieTextureLocation = this.gl.getUniformLocation(this.program, "uMovieTexture");
+        this.logoTextureLocation = this.gl.getUniformLocation(this.program, "uLogoTexture");
         this.positionBuffer = this.gl.createBuffer();
         this.normalBuffer = this.gl.createBuffer();
         this.colorBuffer = this.gl.createBuffer();
         this.textureCoordinateBuffer = this.gl.createBuffer();
         this.screenBuffer = this.gl.createBuffer();
         this.movieTexture = this.gl.createTexture();
+        this.logoTexture = this.gl.createTexture();
         this.movie = null;
+        this.movieImage = null;
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.movieTexture);
         this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, 1, 1, 0, this.gl.RGBA,
             this.gl.UNSIGNED_BYTE, new Uint8Array([16, 19, 26, 255]));
+        this.createLogoTexture();
         this.vertexCount = 0;
         this.viewportWidth = 0;
         this.viewportHeight = 0;
@@ -68,7 +73,12 @@ class SeatixRenderer {
             varying vec2 vTextureCoordinate;
             varying float vScreen;
             uniform sampler2D uMovieTexture;
+            uniform sampler2D uLogoTexture;
             void main() {
+                if (vScreen > 1.5) {
+                    gl_FragColor = texture2D(uLogoTexture, vTextureCoordinate);
+                    return;
+                }
                 if (vScreen > 0.5) {
                     gl_FragColor = texture2D(uMovieTexture, vTextureCoordinate);
                     return;
@@ -102,11 +112,59 @@ class SeatixRenderer {
         return shader;
     }
 
+    createLogoTexture() {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1200;
+        canvas.height = 330;
+        const context = canvas.getContext("2d");
+        const background = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+        background.addColorStop(0, "#211408");
+        background.addColorStop(0.5, "#100c09");
+        background.addColorStop(1, "#281707");
+        context.fillStyle = background;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.strokeStyle = "#d68b32";
+        context.lineWidth = 8;
+        context.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillStyle = "#f3b04f";
+        context.font = "italic 900 190px Georgia, serif";
+        context.fillText("S", 165, 155);
+        context.strokeStyle = "#f3b04f";
+        context.lineWidth = 5;
+        context.beginPath();
+        context.moveTo(78, 273);
+        context.lineTo(252, 273);
+        context.stroke();
+        context.textAlign = "left";
+        context.fillStyle = "#fff4df";
+        context.font = "700 112px Segoe UI, Arial, sans-serif";
+        context.fillText("SEATIX", 305, 143);
+        context.fillStyle = "#f3b04f";
+        context.font = "600 38px Segoe UI, Arial, sans-serif";
+        context.letterSpacing = "15px";
+        context.fillText("CINEMAS", 316, 235);
+
+        const gl = this.gl;
+        gl.bindTexture(gl.TEXTURE_2D, this.logoTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    }
+
     setMovie(movie) {
         this.movie = movie;
+        this.movieImage = null;
+        this.drawMovieScreen(movie, null);
         const image = new Image();
         image.onload = () => {
-            if (this.movie === movie) this.drawMovieScreen(movie, image);
+            if (this.movie === movie) {
+                this.movieImage = image;
+                this.drawMovieScreen(movie, image);
+            }
         };
         image.onerror = () => {
             if (this.movie === movie) {
@@ -120,7 +178,8 @@ class SeatixRenderer {
     drawMovieScreen(movie, image) {
         const screen = document.createElement("canvas");
         screen.width = 2048;
-        screen.height = 1152;
+        screen.height = Math.round(screen.width / this.screenAspectRatio());
+        const scale = screen.height / 1152;
         const context = screen.getContext("2d");
         context.fillStyle = "#10131a";
         context.fillRect(0, 0, screen.width, screen.height);
@@ -144,25 +203,25 @@ class SeatixRenderer {
         context.fillStyle = shade;
         context.fillRect(0, 0, screen.width, screen.height);
         if (image) {
-            const posterHeight = 1000;
+            const posterHeight = screen.height * 0.86;
             const posterWidth = posterHeight * image.naturalWidth / image.naturalHeight;
-            const posterX = screen.width - posterWidth - 48;
-            context.drawImage(image, posterX, 76, posterWidth, posterHeight);
+            const posterX = screen.width - posterWidth - screen.width * 0.0234;
+            context.drawImage(image, posterX, screen.height * 0.066, posterWidth, posterHeight);
         }
         context.fillStyle = "#c9f25a";
-        context.font = "700 42px Segoe UI, Arial, sans-serif";
-        context.fillText("SEATIX  ·  NOW SHOWING", 96, 156);
+        context.font = `700 ${42 * scale}px Segoe UI, Arial, sans-serif`;
+        context.fillText("SEATIX  ·  NOW SHOWING", screen.width * 0.047, screen.height * 0.135);
         context.fillStyle = "#ffffff";
-        let titleSize = 132;
+        let titleSize = 132 * scale;
         context.font = `700 ${titleSize}px Segoe UI, Arial, sans-serif`;
-        while (context.measureText(movie.title).width > 1200 && titleSize > 52) {
-            titleSize -= 2;
+        while (context.measureText(movie.title).width > screen.width * 0.58 && titleSize > 52 * scale) {
+            titleSize -= 2 * scale;
             context.font = `700 ${titleSize}px Segoe UI, Arial, sans-serif`;
         }
-        context.fillText(movie.title, 96, 540);
+        context.fillText(movie.title, screen.width * 0.047, screen.height * 0.469);
         context.fillStyle = "rgba(255, 255, 255, 0.78)";
-        context.font = "500 34px Segoe UI, Arial, sans-serif";
-        context.fillText("EXPERIENCE THE MOVIE IN 3D", 100, 620);
+        context.font = `500 ${34 * scale}px Segoe UI, Arial, sans-serif`;
+        context.fillText("EXPERIENCE THE MOVIE IN 3D", screen.width * 0.049, screen.height * 0.538);
 
         const gl = this.gl;
         gl.bindTexture(gl.TEXTURE_2D, this.movieTexture);
@@ -178,7 +237,9 @@ class SeatixRenderer {
     setSeats(seats) {
         this.seats = seats;
         this.selectedIds.clear();
+        this.camera = this.defaultCamera();
         this.buildGeometry();
+        if (this.movie) this.drawMovieScreen(this.movie, this.movieImage);
         this.draw();
     }
 
@@ -188,20 +249,38 @@ class SeatixRenderer {
         this.draw();
     }
 
+    setInterior(interior) {
+        this.interior = interior;
+        this.buildGeometry();
+        if (this.movie) this.drawMovieScreen(this.movie, this.movieImage);
+        this.draw();
+    }
+
     buildGeometry() {
         const positions = [];
         const normals = [];
         const colors = [];
         const textureCoordinates = [];
         const screenVertices = [];
-        this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, -0.29, 1.2, 35, 0.58, 31, [0.105, 0.13, 0.17]);
-        this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 0.12, -12.1, 25, 0.38, 4.1, [0.18, 0.20, 0.25]);
+        const wall = hexToRgb(this.interior?.wallColor ?? "#19130F");
+        const ceiling = hexToRgb(this.interior?.ceilingColor ?? "#090807");
+        const trim = hexToRgb(this.interior?.trimColor ?? "#70431E");
+        const accent = hexToRgb(this.interior?.accentColor ?? "#EFA23A");
+        const aisleLight = hexToRgb(this.interior?.aisleLightColor ?? "#FFC05B");
+        const rearWall = hexToRgb("#100C09");
+        this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, -0.29, 1.2, 35, 0.58, 31, [0.09, 0.075, 0.06]);
+        this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 7.9, -14.35, 35, 15.8, 0.48, wall);
+        this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 7.9, 16.7, 35, 15.8, 0.48, rearWall);
+        this.addBox(positions, normals, colors, textureCoordinates, screenVertices, -17.25, 7.9, 1.2, 0.5, 15.8, 31, wall);
+        this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 17.25, 7.9, 1.2, 0.5, 15.8, 31, wall);
+        this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 15.8, 1.2, 35, 0.5, 31, ceiling);
+        this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 0.12, -12.1, 25, 0.38, 4.1, trim);
+        this.addRoomInterior(positions, normals, colors, textureCoordinates, screenVertices, trim, accent, aisleLight);
+        this.addRearWallDetails(positions, normals, colors, textureCoordinates, screenVertices, trim, accent, rearWall);
+        this.addSeatPlatforms(positions, normals, colors, textureCoordinates, screenVertices, trim, aisleLight);
+        this.addSeatixLogo(positions, normals, colors, textureCoordinates, screenVertices, trim);
         this.addCurvedScreen(positions, normals, colors, textureCoordinates, screenVertices);
 
-        if (this.seats.some((seat) => seat.section === "Mezzanine")) {
-            this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 2.03, -0.9, 28, 0.32, 7.7, [0.15, 0.17, 0.22]);
-            this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 2.25, 3.05, 28, 0.11, 0.18, [0.42, 0.46, 0.53]);
-        }
         if (this.seats.some((seat) => seat.section === "Balcony")) {
             this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 3.58, 1.2, 28, 0.32, 6.7, [0.17, 0.18, 0.23]);
             this.addBox(positions, normals, colors, textureCoordinates, screenVertices, 0, 3.80, 4.65, 28, 0.11, 0.18, [0.42, 0.46, 0.53]);
@@ -211,9 +290,10 @@ class SeatixRenderer {
             const base = seat.unavailable ? [0.82, 0.24, 0.29]
                 : this.selectedIds.has(seat.id) ? [1.0, 0.39, 0.13]
                     : seat.category === "premium" ? [0.96, 0.76, 0.22]
-                        : [0.13, 0.76, 0.85];
-            const back = base.map((value) => value * 0.79);
-            const frame = [0.29, 0.33, 0.40];
+                        : hexToRgb(this.interior?.seatColor ?? "#1A1715")
+                            .map((value) => Math.min(0.42, value * 1.7 + 0.05));
+            const back = base.map((value) => Math.min(1, value * 1.16));
+            const frame = trim;
             this.addBox(positions, normals, colors, textureCoordinates, screenVertices, seat.x, seat.y + 0.47, seat.z, 0.54, 0.15, 0.54, base);
             this.addBox(positions, normals, colors, textureCoordinates, screenVertices, seat.x, seat.y + 0.86, seat.z + 0.20, 0.54, 0.66, 0.14, back);
             this.addBox(positions, normals, colors, textureCoordinates, screenVertices, seat.x - 0.32, seat.y + 0.58, seat.z, 0.09, 0.20, 0.57, frame);
@@ -229,6 +309,203 @@ class SeatixRenderer {
         this.uploadBuffer(this.screenBuffer, screenVertices, this.screenLocation, 1);
     }
 
+    addRoomInterior(positions, normals, colors, textureCoordinates, screenVertices, trim, accent, aisleLight) {
+        const addBox = (x, y, z, width, height, depth, color) => {
+            this.addBox(positions, normals, colors, textureCoordinates, screenVertices,
+                x, y, z, width, height, depth, color);
+        };
+        const slatCount = this.interior?.wallSlatCount ?? 20;
+        for (const side of [-1, 1]) {
+            for (let index = 0; index < slatCount; index++) {
+                const z = -12.1 + 27 * index / Math.max(1, slatCount - 1);
+                const isLight = index % 4 === 1;
+                addBox(side * 16.91, 7.8, z, 0.12, 15.1, 0.16, isLight ? accent : trim);
+            }
+            for (const z of [-8, -2, 4, 10]) {
+                addBox(side * 16.88, 4.7, z, 0.11, 0.72, 0.36, aisleLight);
+                addBox(side * 16.87, 2.0, z, 0.12, 3.3, 1.65, [0.055, 0.045, 0.035]);
+                addBox(side * 16.78, 3.72, z - 0.88, 0.15, 3.5, 0.13, trim);
+                addBox(side * 16.78, 3.72, z + 0.88, 0.15, 3.5, 0.13, trim);
+                addBox(side * 16.78, 5.42, z, 0.15, 0.13, 1.78, trim);
+            }
+        }
+
+        addBox(0, 15.55, -13.0, 33.6, 0.09, 0.12, accent);
+        addBox(0, 15.55, 15.2, 33.6, 0.09, 0.12, accent);
+        addBox(-16.55, 15.55, 1.1, 0.12, 0.09, 28.1, accent);
+        addBox(16.55, 15.55, 1.1, 0.12, 0.09, 28.1, accent);
+
+        const starCount = this.interior?.ceilingStarCount ?? 180;
+        const columns = 15;
+        const rows = Math.ceil(starCount / columns);
+        for (let index = 0; index < starCount; index++) {
+            const column = index % columns;
+            const row = Math.floor(index / columns);
+            const x = -13.2 + column * 1.88;
+            const z = -10.8 + row * (24.5 / Math.max(rows - 1, 1));
+            addBox(x, 15.48, z, 0.09, 0.04, 0.09, index % 5 === 0 ? aisleLight : accent);
+        }
+
+        const ringCount = this.interior?.ringLightCount ?? 2;
+        for (let index = 0; index < ringCount; index++) {
+            const radiusX = 4.5 - index * 1.25;
+            const radiusZ = 2.25 - index * 0.62;
+            this.addEllipseRing(positions, normals, colors, textureCoordinates, screenVertices,
+                0, 14.95, 0.8, radiusX, radiusZ, 0.16, index === 0 ? aisleLight : accent);
+        }
+
+        addBox(0, 0.24, -12.65, 26, 0.42, 2.1, [0.09, 0.065, 0.045]);
+        addBox(0, 0.48, -11.65, 25.8, 0.07, 0.09, accent);
+        addBox(-13.8, 0.22, -10.9, 0.9, 0.44, 0.9, trim);
+        addBox(13.8, 0.22, -10.9, 0.9, 0.44, 0.9, trim);
+    }
+
+    addSeatPlatforms(positions, normals, colors, textureCoordinates, screenVertices, trim, aisleLight) {
+        const rowGroups = new Map();
+        for (const seat of this.seats) {
+            const rowKey = `${seat.section}:${seat.row}`;
+            let row = rowGroups.get(rowKey);
+            if (!row) {
+                row = { y: seat.y, zTotal: 0, count: 0, blocks: new Map() };
+                rowGroups.set(rowKey, row);
+            }
+            row.zTotal += seat.z;
+            row.count++;
+
+            const block = seat.x < -5.5 ? "left" : seat.x < 6.5 ? "center" : "right";
+            let platform = row.blocks.get(block);
+            if (!platform) {
+                platform = { minX: seat.x, maxX: seat.x, minZ: seat.z, maxZ: seat.z };
+                row.blocks.set(block, platform);
+            }
+            platform.minX = Math.min(platform.minX, seat.x);
+            platform.maxX = Math.max(platform.maxX, seat.x);
+            platform.minZ = Math.min(platform.minZ, seat.z);
+            platform.maxZ = Math.max(platform.maxZ, seat.z);
+        }
+
+        const orderedRows = [...rowGroups.values()].sort((first, second) =>
+            first.zTotal / first.count - second.zTotal / second.count);
+        const previousPlatformTops = new Map();
+        const previousAisleTops = new Map();
+        const addPlatform = (x, y, z, width, height, depth, color) => {
+            this.addBox(positions, normals, colors, textureCoordinates, screenVertices,
+                x, y, z, width, height, depth, color);
+        };
+        for (const row of orderedRows) {
+            const platformTop = row.y + 0.055;
+            const rowZ = row.zTotal / row.count;
+            for (const [platformKey, platform] of row.blocks) {
+                const width = platform.maxX - platform.minX + 0.72;
+                const depth = Math.max(0.68, platform.maxZ - platform.minZ + 0.52);
+                const centerX = (platform.minX + platform.maxX) / 2;
+                const centerZ = (platform.minZ + platform.maxZ) / 2;
+                const previousTop = previousPlatformTops.get(platformKey) ?? 0;
+                const isFirstRow = !previousPlatformTops.has(platformKey);
+                const treadHeight = isFirstRow ? platformTop : 0.12;
+                addPlatform(centerX, platformTop - treadHeight / 2, centerZ, width, treadHeight, depth,
+                    [0.095, 0.073, 0.052]);
+                if (!isFirstRow) {
+                    addPlatform(centerX, (platformTop + previousTop) / 2,
+                        centerZ - depth / 2, width, platformTop - previousTop, 0.07, [0.12, 0.085, 0.052]);
+                }
+                addPlatform(centerX, platformTop - 0.035, centerZ - depth / 2, width, 0.045, 0.045, trim);
+                previousPlatformTops.set(platformKey, platformTop);
+            }
+            for (const x of [-6.0, 5.0]) {
+                const previousTop = previousAisleTops.get(x) ?? 0;
+                const isFirstRow = !previousAisleTops.has(x);
+                const treadHeight = isFirstRow ? platformTop : 0.12;
+                addPlatform(x, platformTop - treadHeight / 2, rowZ, 1.15, treadHeight, 0.68, [0.07, 0.055, 0.04]);
+                if (!isFirstRow) {
+                    addPlatform(x, (platformTop + previousTop) / 2, rowZ - 0.36,
+                        1.15, platformTop - previousTop, 0.07, [0.11, 0.078, 0.045]);
+                }
+                addPlatform(x, platformTop + 0.025, rowZ - 0.29, 1.15, 0.04, 0.055, aisleLight);
+                previousAisleTops.set(x, platformTop);
+            }
+        }
+    }
+
+    addSeatixLogo(positions, normals, colors, textureCoordinates, screenVertices, trim) {
+        const centerX = -14.5;
+        const centerY = 9.2;
+        const wallZ = -13.88;
+        const width = 4.4;
+        const height = 1.2;
+        this.addBox(positions, normals, colors, textureCoordinates, screenVertices,
+            centerX, centerY, wallZ - 0.08, width + 0.24, height + 0.24, 0.12, trim);
+        const left = centerX - width / 2;
+        const right = centerX + width / 2;
+        const bottom = centerY - height / 2;
+        const top = centerY + height / 2;
+        const frontZ = wallZ;
+        const lowerLeft = [left, bottom, frontZ];
+        const lowerRight = [right, bottom, frontZ];
+        const upperLeft = [left, top, frontZ];
+        const upperRight = [right, top, frontZ];
+        this.addTriangle(positions, normals, colors, textureCoordinates, screenVertices,
+            lowerLeft, lowerRight, upperLeft, [1, 1, 1],
+            [[0, 1], [1, 1], [0, 0]], 2);
+        this.addTriangle(positions, normals, colors, textureCoordinates, screenVertices,
+            lowerRight, upperRight, upperLeft, [1, 1, 1],
+            [[1, 1], [1, 0], [0, 0]], 2);
+    }
+
+    addRearWallDetails(positions, normals, colors, textureCoordinates, screenVertices, trim, accent, rearWall) {
+        const addBox = (x, y, z, width, height, depth, color) => {
+            this.addBox(positions, normals, colors, textureCoordinates, screenVertices,
+                x, y, z, width, height, depth, color);
+        };
+        const wallFace = 16.42;
+        const frameDepth = 0.12;
+        addBox(0, 9.2, wallFace, 8.4, 3.15, frameDepth, rearWall);
+        addBox(0, 9.2, wallFace - 0.09, 7.9, 2.56, 0.06, [0.025, 0.02, 0.018]);
+        for (const x of [-4.25, 4.25]) {
+            addBox(x, 9.2, wallFace - 0.08, 0.18, 3.35, 0.16, trim);
+        }
+        for (const y of [7.54, 10.86]) {
+            addBox(0, y, wallFace - 0.08, 8.5, 0.18, 0.16, trim);
+        }
+        addBox(0, 9.2, wallFace - 0.19, 0.46, 0.46, 0.12, accent);
+        addBox(0, 9.2, wallFace - 0.27, 0.17, 0.17, 0.08, [1.0, 0.74, 0.43]);
+
+        addBox(12.3, 4.0, wallFace, 4.2, 7.0, 0.18, trim);
+        addBox(12.3, 4.0, wallFace - 0.12, 3.75, 6.55, 0.08, [0.045, 0.035, 0.028]);
+        addBox(11.25, 4.0, wallFace - 0.2, 0.12, 5.95, 0.1, accent);
+        addBox(13.45, 4.0, wallFace - 0.2, 0.12, 5.95, 0.1, trim);
+        addBox(13.4, 3.8, wallFace - 0.29, 0.09, 0.8, 0.08, accent);
+
+        for (const x of [-15.6, -13.6, -11.6, 11.6, 13.6, 15.6]) {
+            addBox(x, 8.0, wallFace - 0.08, 0.08, 14.8, 0.1, trim);
+        }
+        addBox(0, 15.48, -0.1, 0.12, 0.07, 27.5, accent);
+        addBox(-8.2, 15.48, 0.1, 0.08, 0.07, 27.5, trim);
+        addBox(8.2, 15.48, 0.1, 0.08, 0.07, 27.5, trim);
+    }
+
+    addEllipseRing(positions, normals, colors, textureCoordinates, screenVertices,
+                   centerX, y, centerZ, radiusX, radiusZ, thickness, color) {
+        const segments = 64;
+        for (let index = 0; index < segments; index++) {
+            const firstAngle = 2 * Math.PI * index / segments;
+            const secondAngle = 2 * Math.PI * (index + 1) / segments;
+            const point = (angle, radiusOffset) => [
+                centerX + (radiusX + radiusOffset) * Math.cos(angle),
+                y,
+                centerZ + (radiusZ + radiusOffset) * Math.sin(angle)
+            ];
+            const outerFirst = point(firstAngle, thickness / 2);
+            const innerFirst = point(firstAngle, -thickness / 2);
+            const outerSecond = point(secondAngle, thickness / 2);
+            const innerSecond = point(secondAngle, -thickness / 2);
+            this.addTriangle(positions, normals, colors, textureCoordinates, screenVertices,
+                outerFirst, innerFirst, outerSecond, color);
+            this.addTriangle(positions, normals, colors, textureCoordinates, screenVertices,
+                innerFirst, innerSecond, outerSecond, color);
+        }
+    }
+
     uploadBuffer(buffer, data, location, components = 3) {
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -241,7 +518,8 @@ class SeatixRenderer {
         const segments = 36;
         const radius = 30;
         const halfAngle = 0.42;
-        const screenHeight = radius * 2 * halfAngle * 9 / 16;
+        const screenWidth = radius * 2 * Math.sin(halfAngle);
+        const screenHeight = screenWidth / this.screenAspectRatio();
         const screenBottom = 1.6;
         const screenTop = screenBottom + screenHeight;
         const screenColor = [0.83, 0.89, 0.97];
@@ -260,6 +538,11 @@ class SeatixRenderer {
             this.addTriangle(positions, normals, colors, textureCoordinates, screenVertices,
                 bottomRight, topRight, topLeft, screenColor, [[right, 0], [right, 1], [left, 1]]);
         }
+    }
+
+    screenAspectRatio() {
+        return this.interior?.aspectRatio
+            ?? (this.seats.some((seat) => seat.section === "IMAX") ? 16 / 9 : 2.35);
     }
 
     addBox(positions, normals, colors, textureCoordinates, screenVertices, x, y, z, width, height, depth, color) {
@@ -284,7 +567,7 @@ class SeatixRenderer {
     }
 
     addTriangle(positions, normals, colors, textureCoordinates, screenVertices,
-                first, second, third, color, textureUV = null) {
+                first, second, third, color, textureUV = null, textureMode = 1) {
         const edgeA = [second[0] - first[0], second[1] - first[1], second[2] - first[2]];
         const edgeB = [third[0] - first[0], third[1] - first[1], third[2] - first[2]];
         const normal = normalize([
@@ -299,7 +582,7 @@ class SeatixRenderer {
             normals.push(normal[0], normal[1], normal[2]);
             colors.push(color[0], color[1], color[2]);
             textureCoordinates.push(...(textureUV ? textureUV[index] : [0, 0]));
-            screenVertices.push(textureUV ? 1 : 0);
+            screenVertices.push(textureUV ? textureMode : 0);
         }
     }
 
@@ -327,8 +610,9 @@ class SeatixRenderer {
             this.lastPointer = [event.clientX, event.clientY];
             if (Math.hypot(event.clientX - this.drag.x, event.clientY - this.drag.y) > 4) this.drag.moved = true;
             if (this.drag.button === 0) {
-                this.camera.yaw -= dx * 0.006;
-                this.camera.pitch = clamp(this.camera.pitch + dy * 0.005, 0.12, 1.02);
+                const fullTurn = Math.PI * 2;
+                this.camera.yaw = ((this.camera.yaw - dx * 0.006 + Math.PI) % fullTurn + fullTurn) % fullTurn - Math.PI;
+                this.camera.pitch = clamp(this.camera.pitch + dy * 0.005, 0.08, 0.62);
                 this.draw();
             } else if (this.drag.button === 2) {
                 this.pan(dx, dy);
@@ -360,16 +644,25 @@ class SeatixRenderer {
         const unitsPerPixel = this.camera.distance / Math.max(this.canvas.clientHeight, 1);
         this.camera.target = add(this.camera.target, scale(right, -dx * unitsPerPixel));
         this.camera.target = add(this.camera.target, scale(up, dy * unitsPerPixel));
+        this.camera.target[0] = clamp(this.camera.target[0], -0.5, 0.5);
+        this.camera.target[1] = clamp(this.camera.target[1], 4.2, 5.6);
+        this.camera.target[2] = clamp(this.camera.target[2], -0.5, 0.5);
     }
 
     zoom(amount) {
-        this.camera.distance = clamp(this.camera.distance + amount, 24, 62);
+        this.camera.distance = clamp(this.camera.distance + amount, 8, 13);
         this.draw();
     }
 
     resetCamera() {
-        this.camera = { yaw: 0.12, pitch: 0.39, distance: 39, target: [0, 1.9, 0] };
+        this.camera = this.defaultCamera();
         this.draw();
+    }
+
+    defaultCamera() {
+        return this.seats.some((seat) => seat.section === "Balcony")
+            ? { yaw: 0, pitch: 0.24, distance: 13, target: [0, 5.4, 0] }
+            : { yaw: 0, pitch: 0.24, distance: 13, target: [0, 4.9, 0] };
     }
 
     eyePosition() {
@@ -427,7 +720,7 @@ class SeatixRenderer {
             gl.viewport(0, 0, width, height);
         }
 
-        gl.clearColor(0.055, 0.065, 0.086, 1);
+        gl.clearColor(0.035, 0.03, 0.026, 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.enable(gl.DEPTH_TEST);
         gl.useProgram(this.program);
@@ -451,12 +744,20 @@ class SeatixRenderer {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.movieTexture);
         gl.uniform1i(this.movieTextureLocation, 0);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.logoTexture);
+        gl.uniform1i(this.logoTextureLocation, 1);
         gl.drawArrays(gl.TRIANGLES, 0, this.vertexCount);
     }
 }
 
 function clamp(value, minimum, maximum) {
     return Math.max(minimum, Math.min(maximum, value));
+}
+
+function hexToRgb(color) {
+    const value = Number.parseInt(color.slice(1), 16);
+    return [(value >> 16 & 255) / 255, (value >> 8 & 255) / 255, (value & 255) / 255];
 }
 
 function add(first, second) {

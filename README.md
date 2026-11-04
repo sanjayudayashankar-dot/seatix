@@ -4,7 +4,7 @@ Seatix is a Java-served website with a browser-native WebGL auditorium. It uses 
 
 ## Database setup
 
-1. For a new database, create the Seatix tables by running `database/schema.sql` in MySQL. For an existing database, run `database/booking-contact-migration.sql` once before accepting bookings. If that database predates the payment-status update, also run `database/payment-migration.sql` once.
+1. For a new database, create the Seatix tables by running `database/schema.sql` in MySQL. For an existing database, run `database/interior-layout-migration.sql` to add the screen interior profiles, and run `database/booking-contact-migration.sql` before accepting bookings. If that database predates the payment-status update, also run `database/payment-migration.sql`.
 2. Set the JDBC connection settings in the same terminal used to start the site. The URL is optional if MySQL is on the default local port.
 
 ```powershell
@@ -52,8 +52,12 @@ This static demo is separate from the Java server. To enable bookings later, dep
 ## Website controls
 
 - Choose a movie from the poster shelf to update its poster and title on the curved auditorium screen, then pick a showtime.
-- Choose IMAX, Orchestra / Mezzanine / Balcony, or Standard from the auditorium selector.
+- Choose a screen from the auditorium selector; only screens scheduled for the selected movie are available.
+- The IMAX screen is rendered at 16:9; Standard screens 2 and 3 are rendered at 2.35:1.
+- The Java screen-interior service loads each room's colors, lighting, and aspect ratio from the `screen_interiors` SQL table. The WebGL renderer builds the ceiling, cove rings, acoustic wall slats, exit doors, aisle step lights, stage, and original seat rows from that screen profile. Screen 2 uses the Standard seat map; Screen 3 has Orchestra seating only, with no Mezzanine or Balcony rows, and a 2.35:1 screen.
 - Drag to orbit, right-drag to pan, scroll to zoom, and click individual 3D seats to select them.
+- Use **Easy seat map** to select seats by row with larger, keyboard-accessible buttons; selections stay in sync with the 3D view.
+- Daily demo showtimes are scheduled across three screens without overlapping screenings on the same screen, allowing a 15-minute changeover based on estimated runtimes. Interstellar and The Dark Knight are scheduled only in IMAX; Resident Evil, Jailer 2, and Baththa are scheduled across Standard Screen 2 and Orchestra Screen 3. Select a film, screen, and available time before choosing seats. Confirm actual runtimes and showtimes before using a live schedule.
 - Use “Seat map references” to inspect the supplied layout images.
 - Continue to create a pending booking in MySQL. The checkout dialog can simulate either a successful or failed payment; it never asks for card information and does not move money.
 - Before a booking is created, enter an Indian mobile number and email address. Mobile numbers are normalized to `+91` format and saved with that booking in `booking_contacts`.

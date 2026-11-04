@@ -6,6 +6,10 @@
   "outputDirectory": "src/main/resources/web",
   "rewrites": [
     {
+      "source": "/api/screens/interiors",
+      "destination": "/screen-interiors.json"
+    },
+    {
       "source": "/api/health",
       "destination": "/health.json"
     }

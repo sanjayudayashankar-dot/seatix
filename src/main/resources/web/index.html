@@ -61,12 +61,8 @@
         </div>
         <span class="bar-divider" aria-hidden="true"></span>
         <label class="date-chip" for="showDate"><span class="date-icon" aria-hidden="true">▦</span><input id="showDate" type="date" aria-label="Choose a show date"></label>
-        <div class="time-options" id="timeOptions" aria-label="Choose a showtime">
-            <button type="button" class="time-button" data-time="16:30">4:30 PM</button>
-            <button type="button" class="time-button active" data-time="19:15">7:15 PM</button>
-            <button type="button" class="time-button" data-time="21:50">9:50 PM</button>
-        </div>
-        <span class="format-chip"><span class="status-dot"></span> DOLBY ATMOS</span>
+        <div class="time-options" id="timeOptions" aria-label="Choose a showtime"></div>
+        <span class="format-chip"><span class="status-dot"></span><span class="screen-label" id="screenName">IMAX Screen · 16:9</span></span>
     </section>
 
     <section class="booking-layout" id="auditorium" aria-label="Interactive seat selection">
@@ -77,22 +73,26 @@
                     <h2>Explore the auditorium</h2>
                 </div>
                 <label class="layout-picker">
-                    <span>THEATRE</span>
+                    <span>SCREEN</span>
                     <select id="layoutPicker" aria-label="Choose an auditorium">
-                        <option value="standard">Standard</option>
-                        <option value="imax" selected>IMAX</option>
-                        <option value="orchestra">Orchestra / Mezzanine / Balcony</option>
+                        <option value="standard2">Screen 2 · Standard · 2.35:1</option>
+                        <option value="imax" selected>Screen 1 · IMAX · 16:9</option>
+                        <option value="standard3">Screen 3 · Orchestra · 2.35:1</option>
                     </select>
                 </label>
             </div>
 
             <div class="auditorium-card">
                 <div class="canvas-toolbar">
-                    <div class="live-label"><span class="status-dot"></span> LIVE 3D VIEW</div>
-                    <button class="quiet-button" id="referencesButton" type="button">Seat map references <span aria-hidden="true">↗</span></button>
+                    <div class="live-label"><span class="status-dot"></span> <span id="auditoriumModeLabel">LIVE 3D VIEW</span></div>
+                    <div class="canvas-toolbar-actions">
+                        <button class="quiet-button" id="seatMapToggle" type="button" aria-pressed="false">Easy seat map</button>
+                        <button class="quiet-button" id="referencesButton" type="button">Seat map references <span aria-hidden="true">↗</span></button>
+                    </div>
                 </div>
                 <div class="canvas-container">
                     <canvas id="auditoriumCanvas" aria-label="Interactive 3D cinema auditorium. Drag to rotate and click seats to select."></canvas>
+                    <div class="seat-map-view" id="seatMapView" aria-label="Select seats by row" hidden></div>
                     <div class="canvas-overlay top-left">SCREEN THIS WAY <span aria-hidden="true">↓</span></div>
                     <div class="camera-controls" aria-label="Camera controls">
                         <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
@@ -120,7 +120,7 @@
                 <span class="step-badge">02 / 03</span>
             </div>
             <h2 id="summary-heading">Your seats</h2>
-            <p class="summary-description">Tap any available seat in the 3D view.</p>
+            <p class="summary-description">Select available seats in the 3D view or easy seat map.</p>
             <div class="selected-count" id="selectedCount">No seats selected</div>
             <ul class="selected-list" id="selectedList" aria-live="polite">
                 <li class="empty-selection">Your seats will appear here</li>
@@ -154,8 +154,8 @@
     </div>
     <div class="reference-gallery">
         <figure><img src="/assets/layouts/imax.png" alt="Supplied IMAX auditorium seating map"><figcaption>IMAX</figcaption></figure>
-        <figure><img src="/assets/layouts/orchestra.png" alt="Supplied Orchestra, Mezzanine, and Balcony seating map"><figcaption>Orchestra · Mezzanine · Balcony</figcaption></figure>
-        <figure><img src="/assets/layouts/standard.png" alt="Supplied Standard auditorium seating map"><figcaption>Standard</figcaption></figure>
+        <figure><img src="/assets/layouts/standard.png" alt="Supplied Standard auditorium seating map for Screen 2"><figcaption>Standard · Screen 2</figcaption></figure>
+        <figure><img src="/assets/layouts/orchestra.png" alt="Supplied Orchestra layout reference for Screen 3"><figcaption>Orchestra · Screen 3</figcaption></figure>
     </div>
 </dialog>
 <dialog class="payment-dialog contact-dialog" id="contactDialog" aria-labelledby="contactHeading">

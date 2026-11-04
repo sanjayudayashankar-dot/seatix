@@ -1,6 +1,8 @@
 package com.seatix;
 
 import com.seatix.service.BookingService;
+import com.seatix.model.ScreenInterior;
+import com.seatix.service.ScreenInteriorService;
 import com.seatix.service.BookingService.BookingException;
 import com.seatix.service.BookingService.CreatedBooking;
 import com.seatix.service.BookingService.PaymentResult;
@@ -71,6 +73,10 @@ public final class SeatixServer {
                     + jsonString(databaseStatus()) + "}");
             return;
         }
+        if ("GET".equals(method) && "/api/screens/interiors".equals(path)) {
+            handleScreenInteriors(exchange);
+            return;
+        }
         if ("POST".equals(method) && "/api/bookings".equals(path)) {
             handleCreateBooking(exchange);
             return;
@@ -119,38 +125,71 @@ public final class SeatixServer {
     }
 
     private static void handleCreateBooking(HttpExchange exchange) throws IOException {
-            if (!isConfiguredForPayment(exchange)) return;
-            try {
-                Map<String, String> form = parseRequestForm(exchange);
-                LocalDate showDate = LocalDate.parse(required(form, "date"));
-                LocalTime showTime = LocalTime.parse(required(form, "time"));
-                List<RequestedSeat> seats = parseSeats(required(form, "seats"));
-                CreatedBooking booking = BookingService.create(required(form, "movie"), required(form, "layout"),
-                        showDate, showTime, required(form, "phone"), required(form, "email"), seats);
-                respondJson(exchange, 201, "{\"bookingId\":" + booking.bookingId()
-                        + ",\"bookingStatus\":\"" + booking.bookingStatus()
-                        + "\",\"paymentStatus\":\"PENDING\",\"total\":" + booking.total()
-                        + ",\"seats\":" + jsonArray(booking.seats()) + "}");
-            } catch (BookingException exception) {
-                respondJson(exchange, exception.statusCode(), jsonError(exception.getMessage()));
-            } catch (DateTimeParseException exception) {
-                respondJson(exchange, 400, jsonError("The show date or time is invalid."));
-            } catch (IllegalArgumentException exception) {
-                respondJson(exchange, 400, jsonError(exception.getMessage()));
-            } catch (IllegalStateException exception) {
-                respondJson(exchange, 503, jsonError(exception.getMessage()));
-            } catch (SQLException exception) {
-                reportDatabaseError("Could not create Seatix booking.", exception);
-                if (exception.getErrorCode() == 1062) {
-                    respondJson(exchange, 409, jsonError("One or more seats were just booked. Refresh seat availability and try again."));
-                } else {
-                    respondJson(exchange, databaseUnavailable(exception) ? 503 : 500,
-                            jsonError(databaseUnavailable(exception)
-                                    ? "Seatix could not connect to MySQL. Check the database settings and try again."
-                                    : "Seatix could not save the booking. No payment has been processed."));
-                }
+        if (!isConfiguredForPayment(exchange)) return;
+        try {
+            Map<String, String> form = parseRequestForm(exchange);
+            LocalDate showDate = LocalDate.parse(required(form, "date"));
+            LocalTime showTime = LocalTime.parse(required(form, "time"));
+            List<RequestedSeat> seats = parseSeats(required(form, "seats"));
+            CreatedBooking booking = BookingService.create(required(form, "movie"), required(form, "layout"),
+                    showDate, showTime, required(form, "phone"), required(form, "email"), seats);
+            respondJson(exchange, 201, "{\"bookingId\":" + booking.bookingId()
+                    + ",\"bookingStatus\":\"" + booking.bookingStatus()
+                    + "\",\"paymentStatus\":\"PENDING\",\"total\":" + booking.total()
+                    + ",\"seats\":" + jsonArray(booking.seats()) + "}");
+        } catch (BookingException exception) {
+            respondJson(exchange, exception.statusCode(), jsonError(exception.getMessage()));
+        } catch (DateTimeParseException exception) {
+            respondJson(exchange, 400, jsonError("The show date or time is invalid."));
+        } catch (IllegalArgumentException exception) {
+            respondJson(exchange, 400, jsonError(exception.getMessage()));
+        } catch (IllegalStateException exception) {
+            respondJson(exchange, 503, jsonError(exception.getMessage()));
+        } catch (SQLException exception) {
+            reportDatabaseError("Could not create Seatix booking.", exception);
+            if (exception.getErrorCode() == 1062) {
+                respondJson(exchange, 409, jsonError("One or more seats were just booked. Refresh seat availability and try again."));
+            } else {
+                respondJson(exchange, databaseUnavailable(exception) ? 503 : 500,
+                        jsonError(databaseUnavailable(exception)
+                                ? "Seatix could not connect to MySQL. Check the database settings and try again."
+                                : "Seatix could not save the booking. No payment has been processed."));
             }
         }
+    }
+
+    private static void handleScreenInteriors(HttpExchange exchange) throws IOException {
+        try {
+            String body = ScreenInteriorService.loadAll().stream()
+                    .map(SeatixServer::screenInteriorJson)
+                    .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+            respondJson(exchange, 200, body);
+        } catch (IllegalStateException exception) {
+            respondJson(exchange, 503, jsonError(exception.getMessage()));
+        } catch (SQLException exception) {
+            reportDatabaseError("Could not load Seatix screen interiors.", exception);
+            respondJson(exchange, databaseUnavailable(exception) ? 503 : 500,
+                    jsonError(databaseUnavailable(exception)
+                            ? "Seatix could not connect to MySQL while loading screen interiors."
+                            : "Seatix could not load screen interiors from MySQL."));
+        }
+    }
+
+    private static String screenInteriorJson(ScreenInterior interior) {
+        return "{\"screenCode\":" + jsonString(interior.screenCode())
+                + ",\"screenName\":" + jsonString(interior.screenName())
+                + ",\"screenType\":" + jsonString(interior.screenType())
+                + ",\"aspectRatio\":" + interior.aspectRatio()
+                + ",\"wallColor\":" + jsonString(interior.wallColor())
+                + ",\"ceilingColor\":" + jsonString(interior.ceilingColor())
+                + ",\"trimColor\":" + jsonString(interior.trimColor())
+                + ",\"accentColor\":" + jsonString(interior.accentColor())
+                + ",\"seatColor\":" + jsonString(interior.seatColor())
+                + ",\"aisleLightColor\":" + jsonString(interior.aisleLightColor())
+                + ",\"wallSlatCount\":" + interior.wallSlatCount()
+                + ",\"ceilingStarCount\":" + interior.ceilingStarCount()
+                + ",\"ringLightCount\":" + interior.ringLightCount() + "}";
+    }
 
     private static void handlePayment(HttpExchange exchange, String bookingIdValue) throws IOException {
             if (!isConfiguredForPayment(exchange)) return;

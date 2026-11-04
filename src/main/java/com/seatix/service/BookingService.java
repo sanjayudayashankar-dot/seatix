@@ -38,6 +38,9 @@ public final class BookingService {
         if (!SUPPORTED_MOVIES.contains(movieTitle)) {
             throw new BookingException(400, "Choose a movie from the Seatix movie list.");
         }
+        if (!SCHEDULED_SHOWS.contains(new ScheduledShow(movieTitle, layout, showTime))) {
+            throw new BookingException(400, "That movie is not scheduled in the selected screen at this time.");
+        }
         LocalDateTime showStartsAt = LocalDateTime.of(showDate, showTime);
         if (!showStartsAt.isAfter(LocalDateTime.now()) || showDate.isAfter(LocalDate.now().plusDays(90))) {
             throw new BookingException(400, "The selected show date is outside the booking window.");
@@ -384,13 +387,14 @@ public final class BookingService {
                                  List<String> seats) {}
     public record PaymentResult(long bookingId, String bookingStatus, String paymentStatus,
                                 BigDecimal amount) {}
+    private record ScheduledShow(String movie, Layout layout, LocalTime time) {}
     private record PricedSeat(String section, String row, int number, String category,
                               BigDecimal price, String label) {}
 
     private enum Layout {
-        IMAX("imax", "IMAX", "IMAX"),
-        STANDARD("standard", "Standard", "STANDARD"),
-        ORCHESTRA("orchestra", "Orchestra / Mezzanine / Balcony", "ORCHESTRA");
+        IMAX("imax", "Screen 1 · IMAX", "IMAX"),
+        STANDARD_2("standard2", "Screen 2 · Standard", "STANDARD"),
+        STANDARD_3("standard3", "Orchestra / Mezzanine", "ORCHESTRA");
 
         private final String value;
         private final String displayName;
@@ -426,7 +430,7 @@ public final class BookingService {
                 rowIndex = indexOf(rows, seat.row());
                 count = rowIndex < 0 ? 0 : rowIndex < 10 ? 28 : rowIndex < 20 ? 30 : 26;
                 premium = rowIndex >= 8 && rowIndex <= 12;
-            } else if (this == STANDARD) {
+            } else if (this == STANDARD_2) {
                 rows = new String[]{"AA", "BB", "CC", "DD", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"};
                 expectedSection = "Standard";
                 standardPrice = 260;
@@ -435,22 +439,20 @@ public final class BookingService {
                 count = rowIndex < 0 ? 0 : rowIndex < 4 ? 22 : 24;
                 premium = rowIndex >= 9 && rowIndex <= 11;
                 accessible = rowIndex == 4 && isAccessibleSeat(seat.seatNumber(), count);
-            } else {
+            } else if (this == STANDARD_3) {
                 expectedSection = seat.section();
                 rows = switch (seat.section()) {
                     case "Orchestra" -> new String[]{"CC", "A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L",
                             "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X"};
-                    case "Mezzanine" -> new String[]{"A", "B", "C", "D", "E", "F"};
-                    case "Balcony" -> new String[]{"A", "B", "C", "D", "E", "F", "G", "H"};
                     default -> throw new BookingException(400, "The selected seat is not in this auditorium.");
                 };
-                standardPrice = seat.section().equals("Balcony") ? 250 : seat.section().equals("Mezzanine") ? 300 : 350;
-                premiumPrice = seat.section().equals("Mezzanine") ? 430 : 500;
+                standardPrice = 350;
+                premiumPrice = 500;
                 rowIndex = indexOf(rows, seat.row());
-                count = rowIndex < 0 ? 0 : seat.section().equals("Orchestra")
-                        ? rowIndex < 8 ? 30 : 34 : seat.section().equals("Mezzanine") ? 28 : 26;
-                premium = seat.section().equals("Orchestra") && rowIndex >= 6 && rowIndex <= 10
-                        || seat.section().equals("Mezzanine") && rowIndex <= 2;
+                count = rowIndex < 0 ? 0 : rowIndex < 8 ? 30 : 34;
+                premium = rowIndex >= 6 && rowIndex <= 10;
+            } else {
+                throw new BookingException(400, "Choose a valid Seatix screen.");
             }
 
             if (!expectedSection.equals(seat.section()) || rowIndex < 0
@@ -494,4 +496,19 @@ public final class BookingService {
 
     private static final Set<String> SUPPORTED_MOVIES = Set.of(
             "Interstellar", "The Dark Knight", "Resident Evil", "Jailer 2", "Baththa");
+    private static final Set<ScheduledShow> SCHEDULED_SHOWS = Set.of(
+            new ScheduledShow("Interstellar", Layout.IMAX, LocalTime.of(10, 0)),
+            new ScheduledShow("Interstellar", Layout.IMAX, LocalTime.of(16, 15)),
+            new ScheduledShow("The Dark Knight", Layout.IMAX, LocalTime.of(13, 15)),
+            new ScheduledShow("The Dark Knight", Layout.IMAX, LocalTime.of(19, 30)),
+            new ScheduledShow("Resident Evil", Layout.STANDARD_2, LocalTime.of(10, 0)),
+            new ScheduledShow("Resident Evil", Layout.STANDARD_2, LocalTime.of(18, 0)),
+            new ScheduledShow("Jailer 2", Layout.STANDARD_2, LocalTime.of(12, 15)),
+            new ScheduledShow("Jailer 2", Layout.STANDARD_2, LocalTime.of(20, 15)),
+            new ScheduledShow("Baththa", Layout.STANDARD_2, LocalTime.of(15, 15)),
+            new ScheduledShow("Baththa", Layout.STANDARD_3, LocalTime.of(10, 30)),
+            new ScheduledShow("Baththa", Layout.STANDARD_3, LocalTime.of(18, 30)),
+            new ScheduledShow("Resident Evil", Layout.STANDARD_3, LocalTime.of(13, 15)),
+            new ScheduledShow("Resident Evil", Layout.STANDARD_3, LocalTime.of(21, 15)),
+            new ScheduledShow("Jailer 2", Layout.STANDARD_3, LocalTime.of(15, 30)));
 }
