@@ -32,7 +32,7 @@ The project includes a `Dockerfile` and a Render Blueprint in `render.yaml`. The
 
 1. Create a PostgreSQL project with your database provider and run `database/schema.sql` against the database.
 2. Push this repository to GitHub and connect it to Render using **New → Blueprint**. Render reads `render.yaml` and builds the Docker image.
-3. When prompted, set `SEATIX_DB_URL` to the provider's JDBC URL (`jdbc:postgresql://...`), and set `SEATIX_DB_USER` and `SEATIX_DB_PASSWORD` to the database credentials. Keep these values in provider secrets, never in source control.
+3. When prompted, set `SEATIX_DB_URL` to the PostgreSQL connection URI from Neon (it starts with `postgresql://`). The backend accepts this URI directly and reads its username and password without exposing them as separate variables. Keep the URI in Render's secret environment settings, never in source control.
 4. Wait for the deployment, then check `https://<your-service>.onrender.com/api/health`. Bookings are enabled when the response reports `"database":"connected"`.
 
 The Render free web service spins down after inactivity and the Neon free database scales to zero, so the first request after a quiet period can be slow. This route is suitable for a demo, not production. Do not collect real customer data or sell real tickets until the authentication, payment, inventory, privacy, and operational requirements are implemented.
