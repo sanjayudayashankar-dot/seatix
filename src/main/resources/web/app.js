@@ -518,6 +518,10 @@ async function simulatePayment(outcome) {
     paymentStatusMessage.textContent = "Updating the payment record…";
     try {
         const result = await postForm(`/api/bookings/${pendingBooking.bookingId}/payment`, { outcome });
+        const total = Number(result.total);
+        if (!Number.isFinite(total)) {
+            throw new Error("Seatix did not return a valid payment total.");
+        }
         pendingBooking.paymentStatus = result.paymentStatus;
         if (result.paymentStatus === "SUCCESS" && result.bookingStatus === "CONFIRMED") {
             for (const seat of currentSeats) {
@@ -527,7 +531,7 @@ async function simulatePayment(outcome) {
             updateSelection();
             paymentActions.hidden = true;
             retryPaymentButton.hidden = true;
-            showBookingConfirmation(pendingBooking, result.amount);
+            showBookingConfirmation(pendingBooking, total);
         } else if (result.paymentStatus === "FAILED") {
             const expired = result.bookingStatus === "CANCELLED" && outcome === "success";
             setPaymentStatus("FAILED", expired ? "Checkout expired · no charge made" : "Payment failed · no charge made",
