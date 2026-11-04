@@ -444,7 +444,7 @@ async function loadScreenInteriors() {
         response = await fetch("/api/screens/interiors");
         if (!response.ok) throw new Error(`Interior service returned ${response.status}.`);
     } catch (apiError) {
-        console.warn("Could not load screen interiors from the Java/MySQL service; trying bundled defaults.", apiError);
+        console.warn("Could not load screen interiors from the Java/PostgreSQL service; trying bundled defaults.", apiError);
         try {
             response = await fetch("/screen-interiors.json");
             if (!response.ok) throw new Error(`Bundled screen interiors returned ${response.status}.`);
@@ -556,7 +556,7 @@ function connectServiceStatus() {
             }
             bookingEnabled = data.database === "connected";
             status.textContent = bookingEnabled
-                ? "MySQL connected · simulated payments"
+                ? "Database connected · simulated payments"
                 : "View-only demo · booking disabled";
             bookingAvailability.textContent = bookingEnabled
                 ? "Booking checkout is available; payments are simulated."

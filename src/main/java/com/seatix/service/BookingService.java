@@ -115,7 +115,7 @@ public final class BookingService {
                 String bookingStatus;
                 boolean expired;
                 try (PreparedStatement statement = connection.prepareStatement(
-                        "SELECT status, booking_time < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 15 MINUTE) AS expired "
+                        "SELECT status, booking_time < CURRENT_TIMESTAMP - INTERVAL '15 minutes' AS expired "
                                 + "FROM bookings WHERE booking_id = ? FOR UPDATE")) {
                     statement.setLong(1, bookingId);
                     try (ResultSet result = statement.executeQuery()) {
@@ -178,7 +178,7 @@ public final class BookingService {
     private static long ensureDemoUser(Connection connection) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO users (full_name, email, password_hash) VALUES ('Seatix Demo Guest', ?, 'DEMO_ONLY_NO_LOGIN') "
-                        + "ON DUPLICATE KEY UPDATE user_id = LAST_INSERT_ID(user_id)")) {
+                        + "ON CONFLICT (email) DO NOTHING")) {
             statement.setString(1, DEMO_EMAIL);
             statement.executeUpdate();
         }
@@ -187,7 +187,7 @@ public final class BookingService {
 
     private static void releaseExpiredBookings(Connection connection) throws SQLException {
         String expiredBookings = "SELECT booking_id FROM bookings WHERE status = 'PENDING' "
-                + "AND booking_time < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 15 MINUTE)";
+                + "AND booking_time < CURRENT_TIMESTAMP - INTERVAL '15 minutes'";
         try (PreparedStatement statement = connection.prepareStatement(
                 "UPDATE payments SET payment_status = 'FAILED' WHERE payment_status = 'PENDING' "
                         + "AND booking_id IN (" + expiredBookings + ")")) {
@@ -199,7 +199,7 @@ public final class BookingService {
         }
         try (PreparedStatement statement = connection.prepareStatement(
                 "UPDATE bookings SET status = 'CANCELLED' WHERE status = 'PENDING' "
-                        + "AND booking_time < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 15 MINUTE)")) {
+                        + "AND booking_time < CURRENT_TIMESTAMP - INTERVAL '15 minutes'")) {
             statement.executeUpdate();
         }
     }
@@ -235,7 +235,7 @@ public final class BookingService {
 
     private static long ensureMovie(Connection connection, String title) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
-                "INSERT INTO movies (title) VALUES (?) ON DUPLICATE KEY UPDATE movie_id = LAST_INSERT_ID(movie_id)")) {
+                "INSERT INTO movies (title) VALUES (?) ON CONFLICT (title) DO NOTHING")) {
             statement.setString(1, title);
             statement.executeUpdate();
         }
@@ -245,7 +245,7 @@ public final class BookingService {
     private static long ensureAuditorium(Connection connection, Layout layout) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO auditoriums (cinema_name, auditorium_name, auditorium_type) VALUES ('Seatix Cinemas', ?, ?) "
-                        + "ON DUPLICATE KEY UPDATE auditorium_id = LAST_INSERT_ID(auditorium_id)")) {
+                        + "ON CONFLICT (cinema_name, auditorium_name) DO NOTHING")) {
             statement.setString(1, layout.displayName);
             statement.setString(2, layout.databaseType);
             statement.executeUpdate();
@@ -265,7 +265,7 @@ public final class BookingService {
         Timestamp startsAt = Timestamp.valueOf(startTime);
         try (PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO shows (movie_id, auditorium_id, starts_at) VALUES (?, ?, ?) "
-                        + "ON DUPLICATE KEY UPDATE show_id = LAST_INSERT_ID(show_id)")) {
+                        + "ON CONFLICT (movie_id, auditorium_id, starts_at) DO NOTHING")) {
             statement.setLong(1, movieId);
             statement.setLong(2, auditoriumId);
             statement.setTimestamp(3, startsAt);
@@ -286,7 +286,8 @@ public final class BookingService {
     private static long ensureSeat(Connection connection, long auditoriumId, PricedSeat seat) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO seats (auditorium_id, section_name, row_label, seat_number, category, base_price) "
-                        + "VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE seat_id = LAST_INSERT_ID(seat_id)")) {
+                        + "VALUES (?, ?, ?, ?, ?, ?) "
+                        + "ON CONFLICT (auditorium_id, section_name, row_label, seat_number) DO NOTHING")) {
             statement.setLong(1, auditoriumId);
             statement.setString(2, seat.section());
             statement.setString(3, seat.row());

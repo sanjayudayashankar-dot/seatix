@@ -4,50 +4,51 @@ Seatix is a Java-served website with a browser-native WebGL auditorium. It uses 
 
 ## Database setup
 
-1. For a new database, create the Seatix tables by running `database/schema.sql` in MySQL. For an existing database, run `database/interior-layout-migration.sql` to add the screen interior profiles, and run `database/booking-contact-migration.sql` before accepting bookings. If that database predates the payment-status update, also run `database/payment-migration.sql`.
-2. Set the JDBC connection settings in the same terminal used to start the site. The URL is optional if MySQL is on the default local port.
+Create an empty PostgreSQL database, then run `database/schema.sql` against it. The SQL migration files are for the former MySQL version and are not compatible with this PostgreSQL backend. Existing MySQL records are not automatically copied; migrate them separately before switching databases.
+
+Set the JDBC connection settings in the same terminal used to start the site. The URL is optional for a local PostgreSQL database using the default port and database name.
 
 ```powershell
-$env:SEATIX_DB_URL = "jdbc:mysql://localhost:3306/seatix?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true"
-$env:SEATIX_DB_USER = "your_mysql_user"
-$env:SEATIX_DB_PASSWORD = "your_mysql_password"
+$env:SEATIX_DB_URL = "jdbc:postgresql://localhost:5432/seatix"
+$env:SEATIX_DB_USER = "your_postgres_user"
+$env:SEATIX_DB_PASSWORD = "your_postgres_password"
 ```
 
 The site creates its demo guest, supported movie, auditorium and show records when the first booking is made. Do not use the generated demo guest for production customer accounts.
 
 ## Run locally
 
-Requirements: JDK 17+, Maven 3.9+, and MySQL 8+.
+Requirements: JDK 17+, Maven 3.9+, and PostgreSQL.
 
 ```powershell
 mvn compile exec:java
 ```
 
-Open [http://localhost:8080](http://localhost:8080). Set `SEATIX_PORT` to change the default port. The website reports MySQL as unconfigured until the credentials are provided.
+Open [http://localhost:8080](http://localhost:8080). Set `SEATIX_PORT` to change the default port. The website reports the database as unconfigured until the credentials are provided.
 
-## Deploy as a shareable demo
+## Free backend deployment
 
-The project includes a `Dockerfile` for container-based Java hosting. The container listens on `0.0.0.0` and uses the platform-provided `PORT` (default `8080`). Configure these environment variables in the hosting provider:
+The project includes a `Dockerfile` and a Render Blueprint in `render.yaml`. The app and its frontend are served together by the Java backend. For a free demo, use Render's free Docker web service with an external free PostgreSQL database such as Neon:
 
-- `SEATIX_DB_URL`: JDBC URL for a reachable MySQL 8 database.
-- `SEATIX_DB_USER` and `SEATIX_DB_PASSWORD`: credentials for that database.
-- `SEATIX_HOST`: set to `0.0.0.0` if overriding the container default.
-- `PORT`: set automatically by many hosting providers.
+1. Create a PostgreSQL project with your database provider and run `database/schema.sql` against the database.
+2. Push this repository to GitHub and connect it to Render using **New → Blueprint**. Render reads `render.yaml` and builds the Docker image.
+3. When prompted, set `SEATIX_DB_URL` to the provider's JDBC URL (`jdbc:postgresql://...`), and set `SEATIX_DB_USER` and `SEATIX_DB_PASSWORD` to the database credentials. Keep these values in provider secrets, never in source control.
+4. Wait for the deployment, then check `https://<your-service>.onrender.com/api/health`. Bookings are enabled when the response reports `"database":"connected"`.
 
-Run `database/schema.sql` on the hosted database before deploying. Keep database credentials in the provider's secret settings, never in source control or the Docker image. Configure the provider's health check to `GET /api/health`.
+The Render free web service spins down after inactivity and the Neon free database scales to zero, so the first request after a quiet period can be slow. This route is suitable for a demo, not production. Do not collect real customer data or sell real tickets until the authentication, payment, inventory, privacy, and operational requirements are implemented.
 
 This project is currently a **demo**, not a production ticketing service: payment is simulated, seat availability is not loaded from a live theatre inventory, and customer contact details are stored without account verification or a self-service deletion flow. Visitors are warned to use test contact details only. Do not collect real customer data or sell real tickets until those production requirements are implemented.
 
 ### Free static demo: Vercel
 
-The root `vercel.json` publishes only `src/main/resources/web`, which contains the interactive auditorium, supplied posters, and reference layouts. No JavaScript build tooling or package manager is required. This is a **view-only** deployment: Vercel does not run the Java/MySQL backend, and `/api/health` is rewritten to a static response that keeps booking and contact-data collection disabled.
+The root `vercel.json` publishes only `src/main/resources/web`, which contains the interactive auditorium, supplied posters, and reference layouts. No JavaScript build tooling or package manager is required. This is a **view-only** deployment: Vercel does not run the Java/PostgreSQL backend, and `/api/health` is rewritten to a static response that keeps booking and contact-data collection disabled.
 
 1. Import the private GitHub repository `sanjayudayashankar-dot/seatix` in the Vercel dashboard.
 2. Keep the project root at the repository root. Vercel reads `vercel.json`; no build command or environment variables are needed.
 3. Deploy, then use the HTTPS URL Vercel gives the project.
 4. Open the public site, confirm it says **View-only demo · booking disabled**, and share the URL.
 
-This static demo is separate from the Java server. To enable bookings later, deploy the Java backend and configure a protected MySQL-compatible database; do not expose customer contact details in a public demo.
+This static demo is separate from the Java server. To enable bookings, use the Docker deployment above; do not expose customer contact details in a public demo.
 
 ## Website controls
 
@@ -59,7 +60,7 @@ This static demo is separate from the Java server. To enable bookings later, dep
 - Use **Easy seat map** to select seats by row with larger, keyboard-accessible buttons; selections stay in sync with the 3D view.
 - Daily demo showtimes are scheduled across three screens without overlapping screenings on the same screen, allowing a 15-minute changeover based on estimated runtimes. Interstellar and The Dark Knight are scheduled only in IMAX; Resident Evil, Jailer 2, and Baththa are scheduled across Standard Screen 2 and Orchestra Screen 3. Select a film, screen, and available time before choosing seats. Confirm actual runtimes and showtimes before using a live schedule.
 - Use “Seat map references” to inspect the supplied layout images.
-- Continue to create a pending booking in MySQL. The checkout dialog can simulate either a successful or failed payment; it never asks for card information and does not move money.
+- Continue to create a pending booking in PostgreSQL. The checkout dialog can simulate either a successful or failed payment; it never asks for card information and does not move money.
 - Before a booking is created, enter an Indian mobile number and email address. Mobile numbers are normalized to `+91` format and saved with that booking in `booking_contacts`.
 
 ## Booking and payment status

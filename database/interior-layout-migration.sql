@@ -1,4 +1,5 @@
-USE seatix;
+-- Legacy MySQL migration. The current backend uses PostgreSQL; use schema.sql
+-- to initialize a new PostgreSQL database.
 
 CREATE TABLE IF NOT EXISTS screen_interiors (
     screen_code VARCHAR(24) PRIMARY KEY,

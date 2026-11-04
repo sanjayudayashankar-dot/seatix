@@ -1,6 +1,5 @@
-USE seatix;
-
--- Run once against an existing Seatix database before accepting new bookings.
+-- Legacy MySQL migration. The current backend uses PostgreSQL; use schema.sql
+-- to initialize a new PostgreSQL database.
 CREATE TABLE IF NOT EXISTS booking_contacts (
     booking_id BIGINT PRIMARY KEY,
     phone_e164 VARCHAR(13) NOT NULL,

@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: seatix
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: SEATIX_DB_URL
+        sync: false
+      - key: SEATIX_DB_USER
+        sync: false
+      - key: SEATIX_DB_PASSWORD
+        sync: false

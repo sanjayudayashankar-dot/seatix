@@ -152,7 +152,7 @@ public final class SeatixServer {
             } else {
                 respondJson(exchange, databaseUnavailable(exception) ? 503 : 500,
                         jsonError(databaseUnavailable(exception)
-                                ? "Seatix could not connect to MySQL. Check the database settings and try again."
+                                ? "Seatix could not connect to PostgreSQL. Check the database settings and try again."
                                 : "Seatix could not save the booking. No payment has been processed."));
             }
         }
@@ -170,8 +170,8 @@ public final class SeatixServer {
             reportDatabaseError("Could not load Seatix screen interiors.", exception);
             respondJson(exchange, databaseUnavailable(exception) ? 503 : 500,
                     jsonError(databaseUnavailable(exception)
-                            ? "Seatix could not connect to MySQL while loading screen interiors."
-                            : "Seatix could not load screen interiors from MySQL."));
+                            ? "Seatix could not connect to PostgreSQL while loading screen interiors."
+                            : "Seatix could not load screen interiors from PostgreSQL."));
         }
     }
 
@@ -215,7 +215,7 @@ public final class SeatixServer {
                 reportDatabaseError("Could not update Seatix payment status.", exception);
                 respondJson(exchange, databaseUnavailable(exception) ? 503 : 500,
                         jsonError(databaseUnavailable(exception)
-                                ? "Seatix could not connect to MySQL. The payment remains unchanged."
+                                ? "Seatix could not connect to PostgreSQL. The payment remains unchanged."
                                 : "Seatix could not update the payment status."));
             }
         }
@@ -223,7 +223,7 @@ public final class SeatixServer {
     private static boolean isConfiguredForPayment(HttpExchange exchange) throws IOException {
             if (DatabaseConnection.isConfigured()) return true;
             respondJson(exchange, 503, jsonError(
-                    "MySQL is not configured. Set SEATIX_DB_USER and SEATIX_DB_PASSWORD before starting Seatix."));
+                    "PostgreSQL is not configured. Set SEATIX_DB_USER and SEATIX_DB_PASSWORD before starting Seatix."));
             return false;
         }
 
@@ -232,7 +232,7 @@ public final class SeatixServer {
             try (Connection connection = DatabaseConnection.open()) {
                 return connection.isValid(2) ? "connected" : "unavailable";
             } catch (SQLException exception) {
-                reportDatabaseError("Seatix health check could not connect to MySQL.", exception);
+                reportDatabaseError("Seatix health check could not connect to PostgreSQL.", exception);
                 return "unavailable";
             }
         }

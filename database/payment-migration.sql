@@ -1,4 +1,5 @@
-USE seatix;
+-- Legacy MySQL migration. The current backend uses PostgreSQL; use schema.sql
+-- to initialize a new PostgreSQL database.
 
 -- Run once only against a database created from the previous Seatix schema.
 -- These keys are already present when the current schema.sql creates the tables.

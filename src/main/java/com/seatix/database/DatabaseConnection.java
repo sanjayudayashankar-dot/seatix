@@ -6,7 +6,7 @@ import java.sql.SQLException;
 
 public final class DatabaseConnection {
     private static final String DEFAULT_URL =
-            "jdbc:mysql://localhost:3306/seatix?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true";
+            "jdbc:postgresql://localhost:5432/seatix";
 
     private DatabaseConnection() {}
 
